@@ -1,0 +1,4 @@
+interface:
+  display_name: "Generate DESIGN.md Spec"
+  short_description: "Create machine-readable design tokens"
+  default_prompt: "Use $spec-design-md to turn this design brief into a spec-compliant DESIGN.md with typed tokens and all eight prose sections."

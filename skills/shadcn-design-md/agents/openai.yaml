@@ -1,0 +1,4 @@
+interface:
+  display_name: "Document Existing shadcn Design"
+  short_description: "Extract observed UI tokens into DESIGN.md"
+  default_prompt: "Use $shadcn-design-md to inspect this existing shadcn/Tailwind codebase and write a grounded DESIGN.md. Do not invent tokens."
