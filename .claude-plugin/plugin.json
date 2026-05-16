@@ -1,0 +1,4 @@
+{
+  "name": "hungify-skills",
+  "skills": ["./skills/shadcn-design-md", "./skills/spec-design-md"]
+}
