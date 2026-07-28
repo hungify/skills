@@ -1,22 +1,68 @@
 # skills
 
-A pair of Claude skills for working with [DESIGN.md](https://github.com/google-labs-code/design.md) — Google Labs' open-source format for describing design systems to AI coding agents.
+Hybrid repo for **Claude/Cursor agent skills** and related **npm packages**.
 
-```md
-design-md-skills/
-├── spec-design-md/ # Brief → DESIGN.md (greenfield)
-│ └── SKILL.md
-└── shadcn-design-md/ # Codebase → DESIGN.md (reverse-engineer)
-└── SKILL.md
+```text
+skills/                  # Agent skills (SKILL.md + scripts) — not npm workspace members
+  spec-design-md/        # Brief → DESIGN.md
+  shadcn-design-md/      # Codebase → DESIGN.md
+  figma-component-registry/
+  figma-implement-component/
+  figma-implement-screen/
+packages/                # Publishable Node packages (own lockfile + CI each)
+  figma-fidelity/        # MCP visual fidelity: Figma gold ↔ live capture
 ```
+
+This is a **hybrid content monorepo** (model A): skills stay file-based; packages are independent npm projects under `packages/*`. There is **no** root `pnpm-workspace.yaml` / root `package.json` yet. When a second publishable package lands, graduate to a real pnpm workspace (model B).
 
 ---
 
-## Why these skills exist
+## Packages
+
+| Package | Role | Install |
+| --- | --- | --- |
+| [`figma-fidelity`](packages/figma-fidelity) | MCP + CLI: fetch Figma gold, capture app, multi-signal compare, artifact done-gate | `pnpm add figma-fidelity` (after publish) |
+
+Develop / test locally:
+
+```bash
+cd packages/figma-fidelity
+pnpm install
+pnpm test
+pnpm exec tsc --noEmit
+```
+
+CI: [`.github/workflows/figma-fidelity.yml`](.github/workflows/figma-fidelity.yml) (path-filtered). Capture thresholds are **PROVISIONAL** — see [`packages/figma-fidelity/docs/CAPTURE.md`](packages/figma-fidelity/docs/CAPTURE.md) when that package is on the branch.
+
+---
+
+## Figma implement skills
+
+Agent playbooks for Figma → code with evidence gates (pair with `figma-fidelity` for visual proof):
+
+| Skill | Role |
+| --- | --- |
+| `figma-component-registry` | Figma props ↔ code API bindings + drift checks |
+| `figma-implement-component` | DS primitive implement + harness + coverage / fidelity gate |
+| `figma-implement-screen` | Screen/page implement + inventory + visual contracts |
+
+Merge order when landing from PRs: registry → implement-component → implement-screen. `figma-fidelity` can land in parallel.
+
+---
+
+## DESIGN.md skills
+
+A pair of Claude skills for working with [DESIGN.md](https://github.com/google-labs-code/design.md) — Google Labs' open-source format for describing design systems to AI coding agents.
+
+```md
+skills/
+├── spec-design-md/   # Brief → DESIGN.md (greenfield)
+└── shadcn-design-md/ # Codebase → DESIGN.md (reverse-engineer)
+```
+
+### Why these skills exist
 
 AI coding agents generate generic UIs by default. Drop a `DESIGN.md` in your repo and they stop guessing — they apply your exact colors, fonts, spacing, and component rules on every generation.
-
-These two skills cover the two ways you arrive at a `DESIGN.md`:
 
 |                    | `spec-design-md`                     | `shadcn-design-md`                                     |
 | ------------------ | ------------------------------------ | ------------------------------------------------------ |
@@ -26,9 +72,7 @@ These two skills cover the two ways you arrive at a `DESIGN.md`:
 | **Spec**           | Google Labs DESIGN.md (lint-passing) | shadcn/Tailwind conventions                            |
 | **Use when**       | Starting a new project               | Documenting an existing one                            |
 
----
-
-## spec-design-md
+### spec-design-md
 
 **Greenfield.** Give it a brand name, a mood, and a primary color — it produces a complete `DESIGN.md` from scratch.
 
@@ -88,9 +132,7 @@ components:
 ## Do's and Don'ts
 ```
 
----
-
-## shadcn-design-md
+### shadcn-design-md
 
 **Reverse-engineer.** Points at an existing shadcn/Tailwind project and extracts its visual language into a `DESIGN.md` that any agent can use to build new pages that look indistinguishable from the existing app.
 
@@ -128,9 +170,7 @@ tonal contrast alone; no shadow is used at this elevation level...
 
 No YAML frontmatter. No invented hex values. References stay as `var(--token)` and Tailwind classes so the file stays in sync with `globals.css` without a separate export step.
 
----
-
-## Choosing the right skill
+### Choosing the right DESIGN.md skill
 
 ```md
 New project, no code yet?
@@ -143,9 +183,7 @@ Want to feed design context to Claude Code / Cursor?
 → Either, depending on above — both produce agent-ready DESIGN.md files
 ```
 
----
-
-## Spec compliance
+### Spec compliance
 
 `spec-design-md` targets the Google Labs open-source spec directly:
 
@@ -165,3 +203,4 @@ Want to feed design context to Claude Code / Cursor?
 - [google-labs-code/design.md](https://github.com/google-labs-code/design.md) — official spec and CLI
 - [shadcn/ui skills](https://ui.shadcn.com/docs/skills) — shadcn's own Claude Code skill for component generation
 - [awesome-design-md](https://github.com/VoltAgent/awesome-design-md) — community DESIGN.md examples
+- [`figma-fidelity`](packages/figma-fidelity) — Figma ↔ code visual fidelity MCP (when present on branch)

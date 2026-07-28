@@ -1,0 +1,11 @@
+.superpowers/
+.DS_Store
+node_modules/
+dist/
+*.tsbuildinfo
+.turbo/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
