@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 5,
+  "name": "bad-duplicate-primary",
+  "target": { "kind": "screen", "route": "/fixture" },
+  "source": { "fileKey": "x", "nodes": [{ "id": "desktop", "nodeId": "1:2" }] },
+  "detectedComponents": [
+    { "sourceId": "desktop", "nodeId": "2:1", "name": "Button", "kind": "design-system" }
+  ],
+  "implementationFiles": [
+    ".agents/skills/figma-implement-screen/scripts/fixtures/good-button/GoodButton.tsx"
+  ],
+  "resolved": [
+    {
+      "kind": "design-system",
+      "figmaNodes": ["2:1"],
+      "codeComponent": "Button",
+      "importPath": "#/components/ui/button",
+      "decision": "reuse"
+    }
+  ],
+  "unresolved": [],
+  "screenCompositions": [],
+  "assets": [],
+  "visualContracts": [
+    {
+      "id": "desktop.region.fixture-card",
+      "sourceId": "desktop",
+      "sourceNodeId": "1:2",
+      "goldNodeId": "1:3",
+      "role": "primary",
+      "scope": "region",
+      "region": "fixture-card",
+      "viewport": { "name": "desktop", "width": 1440, "height": 1024 },
+      "outDir": ".figma/artifacts/fixtures/bad-duplicate-primary/desktop/regions/fixture-card",
+      "profile": "component/strict",
+      "selector": "[data-testid=fixture]",
+      "expectSize": { "width": 544, "height": 464 }
+    },
+    {
+      "id": "desktop.page",
+      "sourceId": "desktop",
+      "sourceNodeId": "1:2",
+      "goldNodeId": "1:2",
+      "role": "primary",
+      "scope": "page",
+      "viewport": { "name": "desktop", "width": 1440, "height": 1024 },
+      "outDir": ".figma/artifacts/fixtures/bad-duplicate-primary/desktop/page",
+      "profile": "page",
+      "pageReason": "Full page is also marked primary"
+    }
+  ]
+}

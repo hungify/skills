@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 5,
+  "name": "bad-visual-naming",
+  "target": { "kind": "screen", "route": "/fixture" },
+  "source": { "fileKey": "x", "nodes": [{ "intent": "desktop", "nodeId": "1:2" }] },
+  "detectedComponents": [
+    { "sourceId": "desktop", "nodeId": "2:1", "name": "Button", "kind": "design-system" }
+  ],
+  "implementationFiles": [
+    ".agents/skills/figma-implement-screen/scripts/fixtures/good-button/GoodButton.tsx"
+  ],
+  "resolved": [
+    {
+      "kind": "design-system",
+      "figmaNodes": ["2:1"],
+      "codeComponent": "Button",
+      "importPath": "#/components/ui/button",
+      "decision": "reuse"
+    }
+  ],
+  "unresolved": [],
+  "screenCompositions": [],
+  "assets": [],
+  "visualContracts": [
+    {
+      "intent": "desktop",
+      "sourceIntent": "desktop",
+      "sourceNodeId": "1:2",
+      "nodeId": "1:2",
+      "purpose": "gate",
+      "viewport": { "name": "desktop", "width": 1440, "height": 1024 },
+      "outDir": ".figma/artifacts/fixtures/bad-visual-naming/desktop",
+      "profile": "page",
+      "pageReason": "The requested node is a full-bleed screen"
+    }
+  ]
+}

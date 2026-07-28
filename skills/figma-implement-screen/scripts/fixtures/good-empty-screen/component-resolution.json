@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 5,
+  "name": "good-empty-screen",
+  "target": { "kind": "screen", "route": "/plain" },
+  "source": { "fileKey": "x", "nodes": [{ "id": "desktop", "nodeId": "1:2" }] },
+  "detectedComponents": [],
+  "ignoredInventoryNodes": [],
+  "implementationFiles": [
+    ".agents/skills/figma-implement-screen/scripts/fixtures/good-empty-screen/GoodPlainScreen.tsx"
+  ],
+  "resolved": [],
+  "unresolved": [],
+  "screenCompositions": [],
+  "entryComponents": [
+    {
+      "componentName": "GoodPlainScreen",
+      "filePath": ".agents/skills/figma-implement-screen/scripts/fixtures/good-empty-screen/GoodPlainScreen.tsx",
+      "role": "screen"
+    }
+  ],
+  "assets": [],
+  "visualContracts": [
+    {
+      "id": "desktop.page",
+      "sourceId": "desktop",
+      "sourceNodeId": "1:2",
+      "goldNodeId": "1:2",
+      "role": "primary",
+      "scope": "page",
+      "viewport": { "name": "desktop", "width": 1440, "height": 1024 },
+      "outDir": ".figma/artifacts/fixtures/good-empty-screen/desktop/page",
+      "profile": "page",
+      "pageReason": "The requested node is a full-bleed plain screen"
+    }
+  ]
+}

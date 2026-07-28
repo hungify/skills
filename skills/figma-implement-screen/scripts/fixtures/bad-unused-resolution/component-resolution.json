@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 5,
+  "name": "bad-unused-resolution",
+  "target": {
+    "kind": "screen",
+    "route": "/pressure"
+  },
+  "source": {
+    "fileKey": "x",
+    "nodes": [
+      {
+        "id": "component",
+        "nodeId": "1:2"
+      }
+    ]
+  },
+  "detectedComponents": [
+    {
+      "sourceId": "component",
+      "nodeId": "2:1",
+      "name": "Button",
+      "kind": "design-system"
+    },
+    {
+      "sourceId": "component",
+      "nodeId": "2:2",
+      "name": "Text field",
+      "kind": "design-system"
+    }
+  ],
+  "implementationFiles": [
+    ".agents/skills/figma-implement-screen/scripts/fixtures/good-button/GoodButton.tsx"
+  ],
+  "resolved": [
+    {
+      "kind": "design-system",
+      "figmaNodes": ["2:1"],
+      "codeComponent": "Button",
+      "importPath": "#/components/ui/button",
+      "decision": "reuse"
+    },
+    {
+      "kind": "design-system",
+      "figmaNodes": ["2:2"],
+      "codeComponent": "TextField",
+      "importPath": "#/components/ui/input",
+      "decision": "reuse"
+    }
+  ],
+  "unresolved": [],
+  "screenCompositions": [],
+  "assets": [],
+  "visualContracts": [
+    {
+      "id": "component.page",
+      "sourceId": "component",
+      "sourceNodeId": "1:2",
+      "goldNodeId": "1:2",
+      "role": "primary",
+      "scope": "page",
+      "viewport": {
+        "name": "desktop",
+        "width": 1440,
+        "height": 1024
+      },
+      "outDir": ".figma/artifacts/fixtures/bad-unused-resolution/component/page",
+      "profile": "page",
+      "pageReason": "Pressure fixture."
+    }
+  ]
+}

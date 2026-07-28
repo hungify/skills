@@ -1,0 +1,8 @@
+{
+  "framework": "react",
+  "packageManager": "npm",
+  "pathAliases": {
+    "@/": "app/"
+  },
+  "screensGlob": "app/modules/*/views/*/"
+}

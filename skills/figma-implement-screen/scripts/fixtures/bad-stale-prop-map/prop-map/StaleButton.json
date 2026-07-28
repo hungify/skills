@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 2,
+  "syncedAt": "2026-07-18T00:00:00Z",
+  "source": {
+    "fileKey": "fixture",
+    "definitionHash": "sha256:fixture"
+  },
+  "target": {
+    "component": "StaleButton",
+    "file": ".agents/skills/figma-implement-screen/scripts/fixtures/bad-stale-prop-map/StaleButton.tsx",
+    "apiHash": "sha256:stale"
+  },
+  "groups": [
+    {
+      "figmaNodeId": "2:1",
+      "name": "Stale button",
+      "mappings": [
+        {
+          "figmaProp": "Size",
+          "figmaType": "VARIANT",
+          "mappingKind": "direct",
+          "reactProp": "size",
+          "valueMap": { "Small": "sm", "Medium": "md" },
+          "confidence": "high",
+          "evidence": [{ "kind": "code-api", "reactProp": "size" }]
+        }
+      ]
+    }
+  ]
+}
