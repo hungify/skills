@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 2,
+  "fileKey": "abc123",
+  "components": [
+    {
+      "codeComponent": "Button",
+      "codeFile": "src/components/ui/button.tsx",
+      "groups": [
+        {
+          "figmaNodeId": "28:518",
+          "name": "btn",
+          "mappings": [
+            {
+              "figmaProp": "Size",
+              "figmaType": "VARIANT",
+              "mappingKind": "direct",
+              "prop": "missingSize",
+              "valueMap": { "Small": "sm", "Large": "lg" }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

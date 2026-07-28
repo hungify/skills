@@ -1,0 +1,5 @@
+{
+  "name": "figma-component-registry",
+  "version": "1.0.0",
+  "description": "Sync and validate the Figma <-> code component prop registry."
+}

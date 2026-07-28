@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 2,
+  "extractor": "typescript-ast",
+  "components": {
+    "Button": {
+      "file": "src/components/ui/button.tsx",
+      "codeApiHash": "sha256:test",
+      "props": {
+        "size": { "source": "cva", "type": "variant", "values": ["sm", "lg"] }
+      }
+    }
+  }
+}

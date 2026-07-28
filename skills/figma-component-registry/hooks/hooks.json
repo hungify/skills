@@ -1,0 +1,24 @@
+{
+  "description": "Warn when a component edit makes the Figma registry stale",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Edit(**/src/components/**)",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/figma-component-registry.mjs check --fail-on-stale --quiet",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "if": "Write(**/src/components/**)",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/figma-component-registry.mjs check --fail-on-stale --quiet",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

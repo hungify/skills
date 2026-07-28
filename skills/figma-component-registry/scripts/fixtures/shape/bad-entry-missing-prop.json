@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 2,
+  "component": {
+    "exportName": "Button",
+    "exportType": "named",
+    "filePath": "src/components/ui/button.tsx"
+  },
+  "figma": {
+    "componentPath": "Button",
+    "lastKnownFileKey": "abc",
+    "lastKnownNodeId": "1:2"
+  },
+  "codePropsMap": {
+    "size": { "type": "enum", "values": ["sm", "md"] }
+  },
+  "figmaBindings": [
+    {
+      "path": "Button > btn > Size",
+      "figmaType": "VARIANT",
+      "mappingKind": "direct",
+      "valueMap": { "Small": "sm", "Regular": "md" }
+    }
+  ]
+}
