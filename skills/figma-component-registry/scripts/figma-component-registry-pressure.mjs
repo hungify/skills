@@ -363,6 +363,32 @@ function testRegistryPath() {
   console.log('registry path → PASS');
 }
 
+function testRegistryPathRejectsTraversalExportName() {
+  assert.throws(
+    () =>
+      registryFilePath({
+        projectRoot: '/repo',
+        registryRoot: 'registry',
+        sourceRoot: 'src/components',
+        filePath: 'src/components/ui/button.tsx',
+        exportName: '../../evil',
+      }),
+    /invalid exportName/,
+  );
+  assert.throws(
+    () =>
+      registryFilePath({
+        projectRoot: '/repo',
+        registryRoot: 'registry',
+        sourceRoot: 'src/components',
+        filePath: 'src/components/ui/button.tsx',
+        exportName: 'ui/Button',
+      }),
+    /invalid exportName/,
+  );
+  console.log('registry path rejects traversal exportName → PASS');
+}
+
 function testMergeGroups() {
   const existing = [
     { figmaNodeId: '1:1', name: 'A', mappings: [] },
@@ -1175,6 +1201,7 @@ const tests = [
   testFlattenBundle,
   testIsPathUnderDirNormalizesSeparators,
   testRegistryPath,
+  testRegistryPathRejectsTraversalExportName,
   testMergeGroups,
   testRecoverMultiGroupNodeIds,
   testFailOnStaleCodePropsMap,
