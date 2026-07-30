@@ -23,6 +23,7 @@ import { withCodeCacheLock } from './lib/infra/cache-io.mjs';
 import { fetchFileNodes } from './lib/infra/figma-client.mjs';
 import { validateRegistryEntry } from './lib/validate/shape.mjs';
 import { validateMatchedSemantic } from './lib/validate/semantic.mjs';
+import { isPathUnderDir } from './lib/paths.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -338,6 +339,16 @@ function testFlattenBundle() {
   assert.strictEqual(bindings[0].mappingKind, 'bundle');
   assert.deepStrictEqual(bindings[0].props, ['checked', 'indeterminate']);
   console.log('flatten bundle → PASS');
+}
+
+function testIsPathUnderDirNormalizesSeparators() {
+  assert.strictEqual(isPathUnderDir('src/components/ui/button.tsx', 'src/components'), true);
+  assert.strictEqual(isPathUnderDir('src/components/ui/button.tsx', './src/components'), true);
+  assert.strictEqual(isPathUnderDir('src/components/ui/button.tsx', 'src/components/'), true);
+  // must NOT false-positive on a directory whose name is a prefix of another
+  assert.strictEqual(isPathUnderDir('src/components-legacy/button.tsx', 'src/components'), false);
+  assert.strictEqual(isPathUnderDir('src/other/button.tsx', 'src/components'), false);
+  console.log('isPathUnderDir normalizes separators → PASS');
 }
 
 function testRegistryPath() {
@@ -1162,6 +1173,7 @@ const tests = [
   testFigmaClientRetries,
   testStripId,
   testFlattenBundle,
+  testIsPathUnderDirNormalizesSeparators,
   testRegistryPath,
   testMergeGroups,
   testRecoverMultiGroupNodeIds,

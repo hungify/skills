@@ -86,6 +86,11 @@ function hashJson(value) {
   return hashContent(JSON.stringify(value));
 }
 
+function isPathUnderDir(filePath, dir) {
+  const relative = path.relative(path.resolve(dir), path.resolve(filePath));
+  return relative !== '' && relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+}
+
 function walkComponentFiles(dir, extensions) {
   const allowedExtensions = new Set(extensions);
   let results = [];
@@ -105,4 +110,4 @@ function walkComponentFiles(dir, extensions) {
   }
   return results;
 }
-export { SHARED_CACHE_DIR, DEFAULT_UI_DIR, CODE_CACHE_NAME, cachePaths, isolatedCacheDir, loadDotEnv, findProjectRoot, getFigmaToken, nowIso, hashContent, hashJson, walkComponentFiles };
+export { SHARED_CACHE_DIR, DEFAULT_UI_DIR, CODE_CACHE_NAME, cachePaths, isolatedCacheDir, loadDotEnv, findProjectRoot, getFigmaToken, nowIso, hashContent, hashJson, isPathUnderDir, walkComponentFiles };

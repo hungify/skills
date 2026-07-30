@@ -10,6 +10,7 @@ import {
   nowIso,
   hashContent,
   hashJson,
+  isPathUnderDir,
   walkComponentFiles,
 } from '../paths.mjs';
 import { checkCodePropsDrift } from '../domain/check-code-drift.mjs';
@@ -18,11 +19,10 @@ import { detectFramework } from '../domain/framework.mjs';
 const EXTRACTOR_VERSION = 9;
 
 function buildCodeRawFromCache(cache, uiDir) {
-  const uiDirPrefix = uiDir.endsWith(path.sep) ? uiDir : `${uiDir}${path.sep}`;
   const extractedComponents = [];
 
   for (const [filePath, entry] of Object.entries(cache)) {
-    if (!filePath.startsWith(uiDirPrefix)) continue;
+    if (!isPathUnderDir(filePath, uiDir)) continue;
     for (const [componentName, component] of Object.entries(entry.components ?? {})) {
       extractedComponents.push({
         componentName,
@@ -56,7 +56,7 @@ function buildCodeRawFromCache(cache, uiDir) {
     componentIndex[component.componentName].push(key);
   }
 
-  return { codeComponents, fullCodeComponents, componentIndex, uiDirPrefix };
+  return { codeComponents, fullCodeComponents, componentIndex };
 }
 
 async function cmdExtractCode(args) {
@@ -77,7 +77,6 @@ async function cmdExtractCode(args) {
   });
   const extractor = await loadExtractor(framework);
   const componentFiles = walkComponentFiles(uiDir, extractor.fileExtensions);
-  const uiDirPrefix = uiDir.endsWith(path.sep) ? uiDir : `${uiDir}${path.sep}`;
 
   let reused = 0;
   let reparsed = 0;
@@ -114,7 +113,7 @@ async function cmdExtractCode(args) {
     }
 
     for (const knownPath of Object.keys(next)) {
-      if (!knownPath.startsWith(uiDirPrefix)) continue;
+      if (!isPathUnderDir(knownPath, uiDir)) continue;
       if (!seenFiles.has(knownPath)) delete next[knownPath];
     }
 
