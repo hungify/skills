@@ -10,6 +10,7 @@ import {
   EXTRACTOR_VERSION,
 } from './lib/commands/extract-code.mjs';
 import { cmdFinalize } from './lib/commands/finalize.mjs';
+import { cmdVerifySource, mappingPropsResolve } from './lib/commands/verify-source.mjs';
 import { checkCodePropsDrift } from './lib/domain/check-code-drift.mjs';
 import { toCodePropsMap } from './lib/domain/code-props-map.mjs';
 import { collectComponents } from './lib/domain/figma-collect.mjs';
@@ -1218,6 +1219,21 @@ function testSemanticRejectsRedundantValueMap() {
   console.log('semantic redundant valueMap → PASS');
 }
 
+function testMappingPropsResolveReportsAllMissing() {
+  const group = {
+    name: 'btn',
+    mappings: [
+      { figmaProp: 'Size', mappingKind: 'direct', prop: 'size' },
+      { figmaProp: 'Show prepend#1:1', mappingKind: 'composition', note: 'x' },
+      { figmaProp: 'Legacy axis', mappingKind: 'unsupported', note: 'y' },
+    ],
+  };
+  const propertyDefinitions = { Size: { type: 'VARIANT' } };
+  const missing = mappingPropsResolve(group, propertyDefinitions);
+  assert.deepStrictEqual(missing, ['Show prepend#1:1', 'Legacy axis']);
+  console.log('mappingPropsResolve reports all missing props → PASS');
+}
+
 const tests = [
   testShapeGood,
   testShapeBad,
@@ -1238,6 +1254,7 @@ const tests = [
   testRegistryLookupFindsUniqueMatch,
   testRegistryLookupFailsLoudOnCollision,
   testRecoverMultiGroupNodeIds,
+  testMappingPropsResolveReportsAllMissing,
   testFailOnStaleCodePropsMap,
   testExtractCodeCommand,
   testExtractCodeDetectsFrameworkWithoutConfig,

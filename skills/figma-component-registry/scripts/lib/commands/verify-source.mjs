@@ -6,16 +6,15 @@ import { findRegistryEntryByExportName } from '../domain/registry-lookup.mjs';
 import { findProjectRoot, getFigmaToken } from '../paths.mjs';
 
 function mappingPropsResolve(group, propertyDefinitions) {
+  const missing = [];
+  const keys = Object.keys(propertyDefinitions ?? {});
   for (const mapping of group.mappings ?? []) {
-    const keys = Object.keys(propertyDefinitions ?? {});
     const found = keys.some(
       (key) => key === mapping.figmaProp || stripFigmaPropId(key) === stripFigmaPropId(mapping.figmaProp),
     );
-    if (!found) {
-      return mapping.figmaProp;
-    }
+    if (!found) missing.push(mapping.figmaProp);
   }
-  return null;
+  return missing;
 }
 
 async function cmdVerifySource(args) {
@@ -93,10 +92,10 @@ async function cmdVerifySource(args) {
         );
       }
 
-      const missingProp = mappingPropsResolve(group, current.propertyDefinitions);
-      if (missingProp) {
+      const missingProps = mappingPropsResolve(group, current.propertyDefinitions);
+      if (missingProps.length > 0) {
         stale.push(
-          `${exportName}: mapping prop "${missingProp}" missing from live Figma definitions for ${group.name}`,
+          `${exportName}: mapping prop(s) "${missingProps.join('", "')}" missing from live Figma definitions for ${group.name}`,
         );
       }
     }
