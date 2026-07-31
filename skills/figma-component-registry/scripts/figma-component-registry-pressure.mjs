@@ -314,6 +314,23 @@ function testStripId() {
     }),
     'Button > btn-size > Show prepend',
   );
+  const bindings = flattenGroupsToBindings({
+    componentPath: 'Button',
+    groups: [
+      {
+        name: 'btn-size',
+        mappings: [
+          {
+            figmaProp: 'Show prepend#529:0',
+            figmaType: 'BOOLEAN',
+            mappingKind: 'composition',
+            note: 'x',
+          },
+        ],
+      },
+    ],
+  });
+  assert.strictEqual(bindings[0].propName, 'Show prepend');
   console.log('path normalize → PASS');
 }
 
@@ -340,6 +357,9 @@ function testFlattenBundle() {
   });
   assert.strictEqual(bindings[0].mappingKind, 'bundle');
   assert.deepStrictEqual(bindings[0].props, ['checked', 'indeterminate']);
+  assert.strictEqual(bindings[0].componentPath, 'Checkbox');
+  assert.strictEqual(bindings[0].groupName, 'Checkbox');
+  assert.strictEqual(bindings[0].propName, 'Checked?');
   console.log('flatten bundle → PASS');
 }
 

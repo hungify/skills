@@ -156,7 +156,7 @@ async function cmdFinalize(args) {
       groupsWithNames[0]?.figmaNodeId ?? existing?.figma?.lastKnownNodeId ?? null;
 
     const entry = {
-      schemaVersion: 2,
+      schemaVersion: 3,
       component: {
         exportName: component.codeComponent,
         exportType: codeComponent.exportType ?? 'named',

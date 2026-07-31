@@ -5,7 +5,7 @@
   "additionalProperties": false,
   "required": ["schemaVersion", "component", "figma", "codePropsMap", "figmaBindings"],
   "properties": {
-    "schemaVersion": { "const": 2 },
+    "schemaVersion": { "const": 3 },
     "component": { "$ref": "#/$defs/component" },
     "figma": { "$ref": "#/$defs/figma" },
     "codePropsMap": { "$ref": "#/$defs/codePropsMap" },
@@ -63,9 +63,12 @@
     "directBinding": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "figmaType", "mappingKind", "prop"],
+      "required": ["path", "componentPath", "groupName", "propName", "figmaType", "mappingKind", "prop"],
       "properties": {
         "path": { "type": "string", "minLength": 1 },
+        "componentPath": { "type": "string", "minLength": 1 },
+        "groupName": { "type": "string", "minLength": 1 },
+        "propName": { "type": "string", "minLength": 1 },
         "figmaType": { "$ref": "#/$defs/figmaType" },
         "mappingKind": { "const": "direct" },
         "prop": { "type": "string", "minLength": 1 },
@@ -79,9 +82,12 @@
     "bundleBinding": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "figmaType", "mappingKind", "props", "valueProps"],
+      "required": ["path", "componentPath", "groupName", "propName", "figmaType", "mappingKind", "props", "valueProps"],
       "properties": {
         "path": { "type": "string", "minLength": 1 },
+        "componentPath": { "type": "string", "minLength": 1 },
+        "groupName": { "type": "string", "minLength": 1 },
+        "propName": { "type": "string", "minLength": 1 },
         "figmaType": { "$ref": "#/$defs/figmaType" },
         "mappingKind": { "const": "bundle" },
         "props": {
@@ -103,9 +109,12 @@
     "noteBinding": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "figmaType", "mappingKind", "note"],
+      "required": ["path", "componentPath", "groupName", "propName", "figmaType", "mappingKind", "note"],
       "properties": {
         "path": { "type": "string", "minLength": 1 },
+        "componentPath": { "type": "string", "minLength": 1 },
+        "groupName": { "type": "string", "minLength": 1 },
+        "propName": { "type": "string", "minLength": 1 },
         "figmaType": { "$ref": "#/$defs/figmaType" },
         "mappingKind": {
           "type": "string",

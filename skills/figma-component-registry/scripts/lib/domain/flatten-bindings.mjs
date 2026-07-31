@@ -1,4 +1,4 @@
-import { bindingPath } from './path-normalize.mjs';
+import { bindingPath, stripFigmaPropId } from './path-normalize.mjs';
 
 function mapKind(kind) {
   if (kind === 'override') return 'bundle';
@@ -21,6 +21,9 @@ function flattenMapping({ componentPath, groupName, groupFigmaNodeId, mapping })
   const mappingKind = mapKind(mapping.mappingKind);
   const base = {
     path: bindingPath({ componentPath, groupName, figmaProp: mapping.figmaProp }),
+    componentPath,
+    groupName,
+    propName: stripFigmaPropId(mapping.figmaProp),
     figmaType: mapping.figmaType,
     mappingKind,
   };
