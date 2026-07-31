@@ -22,6 +22,7 @@ import { stripFigmaPropId, bindingPath } from './lib/domain/path-normalize.mjs';
 import { registryFilePath } from './lib/domain/registry-path.mjs';
 import { loadExtractor } from './lib/extractors/index.mjs';
 import { withCodeCacheLock } from './lib/infra/cache-io.mjs';
+import { withRegistryLock } from './lib/infra/registry-lock.mjs';
 import { fetchFileNodes } from './lib/infra/figma-client.mjs';
 import { validateRegistryEntry } from './lib/validate/shape.mjs';
 import { validateMatchedSemantic } from './lib/validate/semantic.mjs';
@@ -254,6 +255,28 @@ async function testParallelCacheMerge() {
   assert.ok(finalCache['a.tsx'], 'missing a.tsx');
   assert.ok(finalCache['b.tsx'], 'missing b.tsx');
   console.log('parallel cache merge → PASS');
+}
+
+async function testRegistryLockSerializesConcurrentWriters() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fcr-registry-lock-'));
+  const target = path.join(dir, 'registry', 'ui', 'Button.json');
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, JSON.stringify({ groups: [] }));
+
+  async function worker(groupId) {
+    await withRegistryLock(target, async () => {
+      const current = JSON.parse(fs.readFileSync(target, 'utf8'));
+      await new Promise((r) => setTimeout(r, 30));
+      fs.writeFileSync(target, JSON.stringify({ groups: [...current.groups, groupId] }));
+    });
+  }
+
+  await Promise.all([worker('a'), worker('b')]);
+  const final = JSON.parse(fs.readFileSync(target, 'utf8'));
+  assert.ok(final.groups.includes('a'), 'lost writer a — race condition not fixed');
+  assert.ok(final.groups.includes('b'), 'lost writer b — race condition not fixed');
+  assert.strictEqual(final.groups.length, 2, 'exactly one writer should have won the race without the lock');
+  console.log('registry lock serializes concurrent read-merge-write → PASS');
 }
 
 async function testCacheSkipsUnchangedWrite() {
@@ -810,7 +833,7 @@ async function testFinalizeHappyPath() {
   const registryPath = path.join(registryDir, 'ui', 'Button.json');
   assert.ok(fs.existsSync(registryPath), 'missing registry/ui/Button.json');
   const entry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
-  assert.strictEqual(entry.schemaVersion, 2);
+  assert.strictEqual(entry.schemaVersion, 3);
   assert.strictEqual(entry.component.exportName, 'Button');
   assert.ok(Array.isArray(entry.figmaBindings) && entry.figmaBindings.length > 0);
   assert.strictEqual(entry.figmaBindings[0].mappingKind, 'direct');
@@ -1096,6 +1119,100 @@ async function testFinalizeIncompatibleRename() {
   console.log('finalize incompatible rename → PASS');
 }
 
+// Note: deviates from the task brief's originally-proposed fixture. A same-cycle removal of
+// a code prop referenced by `matched.json` is already caught earlier by `validateMatchedSemantic`
+// (prop "X" missing from code API), before `cmdFinalize`'s loop ever calls `toCodePropsMap` — so
+// that scenario can't exercise the new try/catch at all. The real gap `toCodePropsMap`'s catch
+// closes is a *carried-forward* group (recovered from a previous registry entry, not part of the
+// current cycle's `matched.json`) whose bound code prop was removed since it was first written —
+// `validateMatchedSemantic` only validates the current cycle's `matched`, so it never re-checks
+// carried-forward bindings. This test reproduces that: cycle 1 finalizes the `btn` group (binding
+// `size`); cycle 2 only introduces an unrelated `btn-extra` group while the code prop `size` is
+// deleted from the shared cache — the carried-forward `btn` group's stale `size` binding is what
+// must surface as a clean `❌ Button: …` error instead of an uncaught stack trace.
+async function testFinalizeReportsPropRemovalCleanly() {
+  const { dir, cacheDir, sharedCachePath, registryDir } = stageFinalizeProject();
+  const first = await runFinalize({ 'cache-dir': cacheDir, 'project-root': dir });
+  assert.strictEqual(first.exitCode, 0, first.output);
+  assert.ok(
+    fs.existsSync(path.join(registryDir, 'ui', 'Button.json')),
+    'expected cycle 1 to write the registry entry carried forward into cycle 2',
+  );
+
+  const cache = JSON.parse(fs.readFileSync(sharedCachePath, 'utf8'));
+  for (const entry of Object.values(cache)) {
+    for (const component of Object.values(entry.components ?? {})) {
+      delete component.props.size; // remove the code prop the carried-forward `btn` group binds to
+    }
+  }
+  fs.writeFileSync(sharedCachePath, JSON.stringify(cache));
+
+  const secondRaw = {
+    fileKey: 'abc123',
+    fetchedAt: '2026-07-06T10:00:00Z',
+    components: [
+      {
+        name: 'btn',
+        figmaNodeId: '28:518',
+        type: 'COMPONENT_SET',
+        propertyDefinitions: {
+          Size: { type: 'VARIANT', variantOptions: ['Small', 'Large'] },
+          'Show prepend#101:10': { type: 'BOOLEAN', defaultValue: false },
+        },
+      },
+      {
+        name: 'btn-extra',
+        figmaNodeId: '99:1',
+        type: 'COMPONENT_SET',
+        propertyDefinitions: {
+          Extra: { type: 'BOOLEAN', defaultValue: false },
+        },
+      },
+    ],
+  };
+  const secondMatched = {
+    schemaVersion: 2,
+    fileKey: 'abc123',
+    components: [
+      {
+        codeComponent: 'Button',
+        codeFile: 'src/components/ui/button.tsx',
+        groups: [
+          {
+            figmaNodeId: '99:1',
+            name: 'btn-extra',
+            mappings: [
+              {
+                figmaProp: 'Extra',
+                figmaType: 'BOOLEAN',
+                mappingKind: 'unsupported',
+                note: 'not wired up yet',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  fs.mkdirSync(cacheDir, { recursive: true });
+  fs.writeFileSync(path.join(cacheDir, '_figma-props-raw.json'), JSON.stringify(secondRaw));
+  fs.writeFileSync(path.join(cacheDir, '_figma-props-matched.json'), JSON.stringify(secondMatched));
+
+  const { exitCode, output } = await runFinalize({ 'cache-dir': cacheDir, 'project-root': dir });
+
+  assert.strictEqual(exitCode, 1, `expected exit 1; output:\n${output}`);
+  assert.ok(output.includes('❌ Button:'), `expected clean component-scoped error; output:\n${output}`);
+  assert.ok(
+    output.includes('missing code prop "size"'),
+    `expected prop-removal message; output:\n${output}`,
+  );
+  assert.ok(
+    !output.toLowerCase().includes('at object.<anonymous>') && !output.includes('.mjs:'),
+    `expected no raw stack trace; output:\n${output}`,
+  );
+  console.log('finalize reports prop-removal drift cleanly → PASS');
+}
+
 async function testFinalizeSameIdRename() {
   const { dir, cacheDir, registryDir } = stageFinalizeProject();
   const first = await runFinalize({ 'cache-dir': cacheDir, 'project-root': dir });
@@ -1353,6 +1470,7 @@ const tests = [
   testCodeRawPreservesUncertainCandidates,
   testFigmaCollectPrunesVariantMembers,
   testParallelCacheMerge,
+  testRegistryLockSerializesConcurrentWriters,
   testCacheSkipsUnchangedWrite,
   testFigmaClientBatches,
   testFigmaClientRetries,
@@ -1388,6 +1506,7 @@ const tests = [
   testFinalizeRequiresCachedFramework,
   testFinalizeCarriedForwardMissing,
   testFinalizeIncompatibleRename,
+  testFinalizeReportsPropRemovalCleanly,
   testFinalizeSameIdRename,
   testFinalizeDryRun,
   testExtractCodeQuietStale,

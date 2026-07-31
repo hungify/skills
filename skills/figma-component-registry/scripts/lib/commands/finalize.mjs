@@ -13,6 +13,7 @@ import {
 } from '../domain/recover-groups.mjs';
 import { readExistingRegistry } from '../domain/registry-lookup.mjs';
 import { definitionsForMergedGroups } from '../domain/definitions-for-merged-groups.mjs';
+import { withRegistryLock } from '../infra/registry-lock.mjs';
 import { frameworkFromCodeCache } from '../domain/framework.mjs';
 import { validateRegistryEntry, validateMatched } from '../validate/shape.mjs';
 import { validateMatchedSemantic, findCodeComponent } from '../validate/semantic.mjs';
@@ -120,92 +121,105 @@ async function cmdFinalize(args) {
       filePath: component.codeFile,
       exportName: component.codeComponent,
     });
-    const existing = readExistingRegistry(outPath);
-    const existingGroups = existing ? recoverGroupsFromRegistry(existing, raw) : [];
-    const mergedGroups = mergeGroups(existingGroups, component.groups);
-    const mergedCount = mergedGroups.length - component.groups.length;
-    if (mergedCount > 0) {
-      console.log(
-        `   ${component.codeComponent}: carrying forward ${mergedCount} group(s) from previous sync`,
-      );
-    }
 
-    let definitions;
-    try {
-      definitions = await definitionsForMergedGroups(
-        mergedGroups,
-        raw,
-        existing?.figma?.lastKnownFileKey ?? raw.fileKey,
-        fetchOptions,
-      );
-    } catch (error) {
-      console.error(
-        `❌ ${component.codeComponent}: ${error instanceof Error ? error.message : error}`,
-      );
-      process.exit(1);
-    }
-
-    const groupsWithNames = applyRenamedGroupNames(mergedGroups, definitions);
-    const componentPath = component.codeComponent;
-    const figmaBindings = flattenGroupsToBindings({
-      componentPath,
-      groups: groupsWithNames,
-    });
-
-    const primaryNodeId =
-      groupsWithNames[0]?.figmaNodeId ?? existing?.figma?.lastKnownNodeId ?? null;
-
-    const entry = {
-      schemaVersion: 3,
-      component: {
-        exportName: component.codeComponent,
-        exportType: codeComponent.exportType ?? 'named',
-        filePath: component.codeFile,
-      },
-      figma: {
-        componentPath,
-        lastKnownFileKey: raw.fileKey ?? existing?.figma?.lastKnownFileKey ?? null,
-        lastKnownNodeId: primaryNodeId,
-      },
-      codePropsMap: toCodePropsMap(codeComponent.props, figmaBindings),
-      figmaBindings,
-    };
-
-    const entryValidation = validateRegistryEntry(entry);
-    if (!entryValidation.ok) {
-      console.error(`❌ Registry entry invalid for ${component.codeComponent}:`);
-      entryValidation.errors.forEach((problem) => console.error(`   - ${problem}`));
-      process.exit(1);
-    }
-
-    if (dryRun) {
-      const before = fs.existsSync(outPath) ? fs.readFileSync(outPath, 'utf8') : '';
-      const after = `${JSON.stringify(entry, null, 2)}\n`;
-      const status = before === '' ? 'new file' : before === after ? 'unchanged' : 'would update';
-      previewedFiles.push({ outPath, status });
-      console.log(`🔍 [dry-run] ${status}: ${outPath}`);
-      if (status === 'would update' || status === 'new file') {
+    await withRegistryLock(outPath, async () => {
+      const existing = readExistingRegistry(outPath);
+      const existingGroups = existing ? recoverGroupsFromRegistry(existing, raw) : [];
+      const mergedGroups = mergeGroups(existingGroups, component.groups);
+      const mergedCount = mergedGroups.length - component.groups.length;
+      if (mergedCount > 0) {
         console.log(
-          createTwoFilesPatch(
-            'registry (before)',
-            'registry (after)',
-            before,
-            after,
-            '',
-            '',
-            { context: 2 },
-          ),
+          `   ${component.codeComponent}: carrying forward ${mergedCount} group(s) from previous sync`,
         );
       }
-    } else {
-      ensureDir(path.dirname(outPath));
-      writeJsonAtomic(outPath, entry);
-      writtenFiles.push(outPath);
-    }
-    summaries.push({
-      component: component.codeComponent,
-      groups: groupsWithNames,
-      mappings: groupsWithNames.flatMap((group) => group.mappings ?? []),
+
+      let definitions;
+      try {
+        definitions = await definitionsForMergedGroups(
+          mergedGroups,
+          raw,
+          existing?.figma?.lastKnownFileKey ?? raw.fileKey,
+          fetchOptions,
+        );
+      } catch (error) {
+        console.error(
+          `❌ ${component.codeComponent}: ${error instanceof Error ? error.message : error}`,
+        );
+        process.exit(1);
+      }
+
+      const groupsWithNames = applyRenamedGroupNames(mergedGroups, definitions);
+      const componentPath = component.codeComponent;
+      const figmaBindings = flattenGroupsToBindings({
+        componentPath,
+        groups: groupsWithNames,
+      });
+
+      const primaryNodeId =
+        groupsWithNames[0]?.figmaNodeId ?? existing?.figma?.lastKnownNodeId ?? null;
+
+      let codePropsMap;
+      try {
+        codePropsMap = toCodePropsMap(codeComponent.props, figmaBindings);
+      } catch (error) {
+        console.error(
+          `❌ ${component.codeComponent}: ${error instanceof Error ? error.message : error}`,
+        );
+        process.exit(1);
+      }
+
+      const entry = {
+        schemaVersion: 3,
+        component: {
+          exportName: component.codeComponent,
+          exportType: codeComponent.exportType ?? 'named',
+          filePath: component.codeFile,
+        },
+        figma: {
+          componentPath,
+          lastKnownFileKey: raw.fileKey ?? existing?.figma?.lastKnownFileKey ?? null,
+          lastKnownNodeId: primaryNodeId,
+        },
+        codePropsMap,
+        figmaBindings,
+      };
+
+      const entryValidation = validateRegistryEntry(entry);
+      if (!entryValidation.ok) {
+        console.error(`❌ Registry entry invalid for ${component.codeComponent}:`);
+        entryValidation.errors.forEach((problem) => console.error(`   - ${problem}`));
+        process.exit(1);
+      }
+
+      if (dryRun) {
+        const before = fs.existsSync(outPath) ? fs.readFileSync(outPath, 'utf8') : '';
+        const after = `${JSON.stringify(entry, null, 2)}\n`;
+        const status = before === '' ? 'new file' : before === after ? 'unchanged' : 'would update';
+        previewedFiles.push({ outPath, status });
+        console.log(`🔍 [dry-run] ${status}: ${outPath}`);
+        if (status === 'would update' || status === 'new file') {
+          console.log(
+            createTwoFilesPatch(
+              'registry (before)',
+              'registry (after)',
+              before,
+              after,
+              '',
+              '',
+              { context: 2 },
+            ),
+          );
+        }
+      } else {
+        ensureDir(path.dirname(outPath));
+        writeJsonAtomic(outPath, entry);
+        writtenFiles.push(outPath);
+      }
+      summaries.push({
+        component: component.codeComponent,
+        groups: groupsWithNames,
+        mappings: groupsWithNames.flatMap((group) => group.mappings ?? []),
+      });
     });
   }
 
