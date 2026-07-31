@@ -101,6 +101,7 @@ async function cmdFinalize(args) {
     fetchImpl: args.fetchImpl,
     fetchDefinitionGroups: args.fetchDefinitionGroups,
   };
+  const registryLockOptions = args.registryLockOptions ?? {};
 
   const dryRun = args['dry-run'] === true || args['dry-run'] === 'true';
   const writtenFiles = [];
@@ -122,7 +123,7 @@ async function cmdFinalize(args) {
       exportName: component.codeComponent,
     });
 
-    await withRegistryLock(outPath, async () => {
+    const runBody = async () => {
       const existing = readExistingRegistry(outPath);
       const existingGroups = existing ? recoverGroupsFromRegistry(existing, raw) : [];
       const mergedGroups = mergeGroups(existingGroups, component.groups);
@@ -220,7 +221,26 @@ async function cmdFinalize(args) {
         groups: groupsWithNames,
         mappings: groupsWithNames.flatMap((group) => group.mappings ?? []),
       });
-    });
+    };
+
+    if (dryRun) {
+      // Dry-run never writes, so two concurrent dry-runs can't corrupt anything — skip the
+      // concurrency lock entirely so `--dry-run` has no filesystem side effects (no `.lock`
+      // placeholder, no `ensureDir` of the registry directory tree) on a fresh project.
+      await runBody();
+    } else {
+      try {
+        await withRegistryLock(outPath, runBody, registryLockOptions);
+      } catch (error) {
+        if (error?.code === 'ELOCKED') {
+          console.error(
+            `❌ ${component.codeComponent}: could not acquire registry lock (${outPath}.lock); another finalize may be running`,
+          );
+          process.exit(1);
+        }
+        throw error;
+      }
+    }
   }
 
   if (dryRun) {

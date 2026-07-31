@@ -1213,6 +1213,54 @@ async function testFinalizeReportsPropRemovalCleanly() {
   console.log('finalize reports prop-removal drift cleanly → PASS');
 }
 
+// Reviewer finding: definitionsForMergedGroups (inside the lock) can call out to the Figma API
+// with retries, holding the critical section for seconds under real latency — meanwhile
+// withRegistryLock's own retry budget (~4.5s) can be exhausted by a second concurrent finalize,
+// causing lockfile.lock() to reject with an ELOCKED error. That rejection previously propagated
+// uncaught out of cmdFinalize to the top-level main().catch, printing a raw stack trace — the
+// exact failure mode this task exists to eliminate. This test forces that condition
+// deterministically: it holds the lock open (never resolving the callback) and passes
+// `registryLockOptions: { retries: 0 }` so the contended attempt fails immediately instead of
+// waiting out the real ~4.5s retry budget.
+async function testFinalizeReportsLockContentionCleanly() {
+  const { dir, cacheDir, registryDir } = stageFinalizeProject();
+  const target = path.join(registryDir, 'ui', 'Button.json');
+
+  let releaseHeld;
+  const heldLockPromise = withRegistryLock(
+    target,
+    () => new Promise((resolve) => { releaseHeld = resolve; }),
+  );
+  // Give the held lock time to actually acquire before racing the contended attempt.
+  await new Promise((r) => setTimeout(r, 50));
+
+  try {
+    const { exitCode, output } = await runFinalize({
+      'cache-dir': cacheDir,
+      'project-root': dir,
+      registryLockOptions: { retries: 0 },
+    });
+
+    assert.strictEqual(exitCode, 1, `expected exit 1; output:\n${output}`);
+    assert.ok(
+      output.includes('❌ Button:'),
+      `expected clean component-scoped error; output:\n${output}`,
+    );
+    assert.ok(
+      output.toLowerCase().includes('lock'),
+      `expected lock-contention message; output:\n${output}`,
+    );
+    assert.ok(
+      !output.toLowerCase().includes('at object.<anonymous>') && !output.includes('.mjs:'),
+      `expected no raw stack trace; output:\n${output}`,
+    );
+  } finally {
+    releaseHeld();
+    await heldLockPromise;
+  }
+  console.log('finalize reports lock contention cleanly → PASS');
+}
+
 async function testFinalizeSameIdRename() {
   const { dir, cacheDir, registryDir } = stageFinalizeProject();
   const first = await runFinalize({ 'cache-dir': cacheDir, 'project-root': dir });
@@ -1321,6 +1369,39 @@ async function testFinalizeDryRun() {
     assert.ok(fs.existsSync(path.join(cacheDir, file)), `dry-run removed ${file}`);
   }
   console.log('finalize dry-run → PASS');
+}
+
+// Reviewer finding: withRegistryLock unconditionally ensureDir's the lock target's directory
+// and creates a `.lock` placeholder file, and the lock previously wrapped BOTH the dry-run
+// preview branch and the real write branch — so a `--dry-run` finalize on a fresh project
+// created the full `registry/<area>/` directory tree plus a `<Export>.json.lock` file, even
+// though `<Export>.json` itself was never written. Since `registry/` is a durable, git-tracked
+// directory in host projects, this meant a preview-only command dirtied `git status`. Dry-run
+// never writes, so it doesn't need the lock at all; this test asserts no such side effects.
+async function testFinalizeDryRunHasNoFilesystemSideEffects() {
+  const { dir, cacheDir, registryDir } = stageFinalizeProject();
+
+  const { exitCode, output } = await runFinalize({
+    'cache-dir': cacheDir,
+    'project-root': dir,
+    'dry-run': true,
+  });
+
+  assert.strictEqual(exitCode, 0, output);
+  assert.strictEqual(
+    fs.existsSync(path.join(registryDir, 'ui')),
+    false,
+    'dry-run must not create the registry/ui directory tree',
+  );
+  const strayLockFiles = fs.existsSync(registryDir)
+    ? fs.readdirSync(registryDir, { recursive: true }).filter((entry) => entry.endsWith('.lock'))
+    : [];
+  assert.deepStrictEqual(
+    strayLockFiles,
+    [],
+    `dry-run must not create any .lock file; found: ${strayLockFiles.join(', ')}`,
+  );
+  console.log('finalize dry-run has no filesystem side effects → PASS');
 }
 
 async function testExtractCodeQuietStale() {
@@ -1507,8 +1588,10 @@ const tests = [
   testFinalizeCarriedForwardMissing,
   testFinalizeIncompatibleRename,
   testFinalizeReportsPropRemovalCleanly,
+  testFinalizeReportsLockContentionCleanly,
   testFinalizeSameIdRename,
   testFinalizeDryRun,
+  testFinalizeDryRunHasNoFilesystemSideEffects,
   testExtractCodeQuietStale,
 ];
 
