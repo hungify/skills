@@ -1,0 +1,108 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "matched.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "fileKey", "components"],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "fileKey": { "type": "string", "minLength": 1 },
+    "components": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/component" }
+    }
+  },
+  "$defs": {
+    "figmaType": {
+      "type": "string",
+      "enum": ["VARIANT", "BOOLEAN", "TEXT", "INSTANCE_SWAP", "COMPONENT"]
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["codeComponent", "codeFile", "groups"],
+      "properties": {
+        "codeComponent": { "type": "string", "minLength": 1 },
+        "codeFile": { "type": "string", "minLength": 1 },
+        "groups": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/group" },
+          "minItems": 1
+        }
+      }
+    },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["figmaNodeId", "name", "mappings"],
+      "properties": {
+        "figmaNodeId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "mappings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/mapping" },
+          "minItems": 1
+        }
+      }
+    },
+    "directMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["figmaProp", "figmaType", "mappingKind", "prop"],
+      "properties": {
+        "figmaProp": { "type": "string", "minLength": 1 },
+        "figmaType": { "$ref": "#/$defs/figmaType" },
+        "mappingKind": { "const": "direct" },
+        "prop": { "type": "string", "minLength": 1 },
+        "valueMap": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "bundleMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["figmaProp", "figmaType", "mappingKind", "props", "valueProps"],
+      "properties": {
+        "figmaProp": { "type": "string", "minLength": 1 },
+        "figmaType": { "$ref": "#/$defs/figmaType" },
+        "mappingKind": { "const": "bundle" },
+        "props": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "valueProps": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      }
+    },
+    "noteMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["figmaProp", "figmaType", "mappingKind", "note"],
+      "properties": {
+        "figmaProp": { "type": "string", "minLength": 1 },
+        "figmaType": { "$ref": "#/$defs/figmaType" },
+        "mappingKind": {
+          "type": "string",
+          "enum": ["composition", "unsupported", "static"]
+        },
+        "note": { "type": "string", "minLength": 1 }
+      }
+    },
+    "mapping": {
+      "oneOf": [
+        { "$ref": "#/$defs/directMapping" },
+        { "$ref": "#/$defs/bundleMapping" },
+        { "$ref": "#/$defs/noteMapping" }
+      ]
+    }
+  }
+}
