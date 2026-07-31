@@ -197,6 +197,7 @@ redundant. If sets differ semantically or code domain is unknown, provide comple
 ## Finalize rejects
 
 - a matched-artifact `schemaVersion` other than 2 (the matched cycle artifact schema is unchanged; only the durable registry entry schema moved to v3);
+- an *existing* durable registry entry with `schemaVersion` other than 3 — there is no v2 → v3 auto-migration. `finalize` must read an existing entry before it can merge and rewrite it, so re-running `fetch → finalize` against an old entry fails the same way every time; the fix is to delete the stale `registry/<area>/<ExportName>.json` file first, then re-run `fetch → finalize` to regenerate it from scratch. `check`/`extract-code --fail-on-stale` reject the same old entries as stale for the same reason;
 - missing/unknown fields, mapping kinds, code props, or Figma properties;
 - Figma property type drift;
 - incomplete or extra Figma value coverage;

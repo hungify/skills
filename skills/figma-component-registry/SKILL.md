@@ -135,14 +135,20 @@ There is **no** prune, unlink, delete, or registry-remove CLI. Passing `--prune`
 - `fetch` / `extract-code` / `check` `--verbose` — print extra detail to stderr (node/component
   counts, cache hit/miss).
 - `check --components Button,Input` — still extracts the full `--ui-dir` (needed to keep the
-  shared code-cache correct) but scopes the *drift check itself* to the named `exportName`s, so
-  only those components can fail the command. Without `--components`, `check` fails on drift in
-  any extracted component. `verify-source --components Button,Input` is unrelated and mandatory
-  there — it does a live Figma re-check for those registry files specifically.
-- `extract-code` (and `check`, which runs it internally) no longer aborts the whole run when a
-  single source file fails to parse: it skips that file, continues extracting the rest, and
-  prints a `⚠️  N file(s) failed extraction and were skipped:` warning listing each failed file
-  and its error.
+  shared code-cache correct) but scopes the *codePropsMap drift check* to the named
+  `exportName`s, so only those components can fail the command **on drift**. An extraction
+  error anywhere under `--ui-dir` still fails the command regardless of `--components` — an
+  incomplete code cache can't verify anything, scoped or not. Without `--components`, `check`
+  fails on drift in any extracted component. `verify-source --components Button,Input` is
+  unrelated and mandatory there — it does a live Figma re-check for those registry files
+  specifically.
+- `extract-code` no longer aborts the whole run when a single source file fails to parse: it
+  skips that file, continues extracting the rest, and prints a
+  `⚠️  N file(s) failed extraction and were skipped:` warning listing each failed file and its
+  error — plain `extract-code` still exits 0. `check` (which runs the same extraction
+  internally with `--fail-on-stale`) treats any extraction error as a failure and exits
+  non-zero, on top of its usual drift check — an unparseable file means the registry can't be
+  verified, not just that it wasn't found stale.
 
 ## Workflow
 

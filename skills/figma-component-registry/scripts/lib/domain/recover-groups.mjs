@@ -32,7 +32,7 @@ function bindingToMapping(binding, propertyDefinitions) {
 function recoverGroupsFromRegistry(entry, raw) {
   if (entry.schemaVersion !== 3) {
     throw new Error(
-      `registry entry for "${entry.component?.exportName ?? 'unknown'}" is schemaVersion ${entry.schemaVersion}, expected 3 — re-run fetch → finalize to regenerate it (no v2 → v3 auto-migration)`,
+      `registry entry for "${entry.component?.exportName ?? 'unknown'}" is schemaVersion ${entry.schemaVersion}, expected 3 — delete this registry file and re-run fetch → finalize to regenerate it (no v2 → v3 auto-migration; finalize cannot rewrite an old entry it can't first read)`,
     );
   }
 
