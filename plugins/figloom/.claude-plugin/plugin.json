@@ -1,0 +1,20 @@
+{
+  "name": "figloom",
+  "version": "0.1.0",
+  "description": "Figma component registry synchronization and drift detection workflows.",
+  "author": {
+    "name": "hungify",
+    "email": "nmhungify@gmail.com",
+    "url": "https://github.com/hungify"
+  },
+  "homepage": "https://github.com/hungify/skills#figloom",
+  "repository": "https://github.com/hungify/skills",
+  "license": "MIT",
+  "keywords": [
+    "figma",
+    "component-registry",
+    "design-to-code"
+  ],
+  "skills": "./skills/",
+  "hooks": "./hooks/claude-hooks.json"
+}

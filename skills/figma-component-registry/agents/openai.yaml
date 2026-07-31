@@ -1,0 +1,7 @@
+interface:
+  display_name: "Figma Component Registry"
+  short_description: "Sync and validate Figma design-system component props against React/Vue code APIs."
+  default_prompt: "Use $figma-component-registry to sync and validate a code component against its Figma registry entry."
+
+policy:
+  allow_implicit_invocation: true

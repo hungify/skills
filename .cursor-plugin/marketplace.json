@@ -1,0 +1,17 @@
+{
+  "name": "hungify",
+  "owner": {
+    "name": "hungify",
+    "email": "nmhungify@gmail.com"
+  },
+  "metadata": {
+    "description": "Managed agent plugins from hungify."
+  },
+  "plugins": [
+    {
+      "name": "figloom",
+      "source": "plugins/figloom",
+      "description": "Figma component registry synchronization and drift detection workflows."
+    }
+  ]
+}

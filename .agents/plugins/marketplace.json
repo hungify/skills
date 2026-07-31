@@ -1,0 +1,20 @@
+{
+  "name": "hungify",
+  "interface": {
+    "displayName": "Hungify"
+  },
+  "plugins": [
+    {
+      "name": "figloom",
+      "source": {
+        "source": "local",
+        "path": "./plugins/figloom"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}
