@@ -44,6 +44,13 @@ function checkCodePropsDrift(codeComponents, { projectRoot, registryRoot, source
       continue;
     }
 
+    if (entry.schemaVersion !== 3) {
+      stale.push(
+        `${path.relative(projectRoot, registryPath).replace(/\\/g, '/')}: schemaVersion ${entry.schemaVersion}, expected 3 (registry stale)`,
+      );
+      continue;
+    }
+
     let extractedCodePropsMap;
     try {
       extractedCodePropsMap = toCodePropsMap(component.props, entry.figmaBindings ?? []);

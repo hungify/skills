@@ -114,7 +114,7 @@ function testCodePropsDriftIgnoresUnboundProps() {
   fs.writeFileSync(
     registryPath,
     JSON.stringify({
-      schemaVersion: 2,
+      schemaVersion: 3,
       component: { exportName: 'Input', exportType: 'named', filePath: 'ui/input.tsx' },
       figma: { componentPath: 'Input' },
       codePropsMap: { forceState: { type: 'enum', values: ['hover', 'focus'] } },
@@ -148,6 +148,65 @@ function testCodePropsDriftIgnoresUnboundProps() {
   components.Input.props.forceState.values = ['hover', 'pressed'];
   assert.ok(checkCodePropsDrift(components, options)[0]?.includes('codePropsMap drift'));
   console.log('codePropsMap scoped drift → PASS');
+}
+
+// Final whole-branch review finding 2: `checkCodePropsDrift` reads the registry entry directly
+// and never called `recoverGroupsFromRegistry`, so Task 7's schemaVersion guard never applied
+// to it — a schemaVersion-2 entry whose bindings still carry the shared v2/v3 `prop`/`props`
+// fields could hash-match the current extraction and be reported clean. `check` must reject
+// non-v3 entries just like `finalize` does, even when the codePropsMap hash would otherwise match.
+function testCodeDriftRejectsSchemaV2EvenWithoutHashDrift() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fcr-schema-drift-'));
+  const componentFile = path.join(dir, 'ui', 'input.tsx');
+  fs.mkdirSync(path.dirname(componentFile), { recursive: true });
+  fs.writeFileSync(componentFile, 'export {};');
+  const registryPath = registryFilePath({
+    projectRoot: dir,
+    registryRoot: 'registry',
+    sourceRoot: 'ui',
+    filePath: componentFile,
+    exportName: 'Input',
+  });
+  fs.mkdirSync(path.dirname(registryPath), { recursive: true });
+  fs.writeFileSync(
+    registryPath,
+    JSON.stringify({
+      schemaVersion: 2,
+      component: { exportName: 'Input', exportType: 'named', filePath: 'ui/input.tsx' },
+      figma: { componentPath: 'Input' },
+      codePropsMap: { forceState: { type: 'enum', values: ['hover', 'focus'] } },
+      figmaBindings: [
+        {
+          path: 'Input > Input > Force state',
+          figmaType: 'VARIANT',
+          mappingKind: 'direct',
+          prop: 'forceState',
+        },
+      ],
+    }),
+  );
+  const components = {
+    Input: {
+      componentName: 'Input',
+      file: componentFile,
+      // Deliberately identical to the registry's codePropsMap above — the hash would match
+      // and report "no drift" if schemaVersion weren't checked independently of the hash.
+      props: { forceState: { type: 'enum', values: ['hover', 'focus'] } },
+    },
+  };
+  const options = { projectRoot: dir, registryRoot: 'registry', sourceRoot: 'ui' };
+
+  const stale = checkCodePropsDrift(components, options);
+  assert.strictEqual(
+    stale.length,
+    1,
+    `expected schemaVersion staleness even with matching codePropsMap hash; stale:\n${JSON.stringify(stale)}`,
+  );
+  assert.ok(
+    stale[0].includes('schemaVersion 2, expected 3'),
+    `expected schemaVersion message; got: ${stale[0]}`,
+  );
+  console.log('checkCodePropsDrift rejects schemaVersion 2 even without hash drift → PASS');
 }
 
 function testCodeRawPreservesUncertainCandidates() {
@@ -502,7 +561,7 @@ async function testFailOnStaleCodePropsMap() {
   fs.writeFileSync(
     path.join(registryDir, 'Input.json'),
     JSON.stringify({
-      schemaVersion: 2,
+      schemaVersion: 3,
       component: { exportName: 'Input', exportType: 'named', filePath: 'ui/input.tsx' },
       figma: { componentPath: 'Input' },
       codePropsMap: { forceState: { type: 'enum', values: ['stale-only'] } },
@@ -743,6 +802,71 @@ async function testExtractCodeSkipsBrokenFileContinuesOthers() {
     `expected a warning naming Broken.vue; logs:\n${logs.join('\n')}`,
   );
   console.log('extract-code skips broken file, continues others → PASS');
+}
+
+// Final whole-branch review finding 3: a file that fails extraction is skipped (its previous
+// cache entry, if any, is left untouched) rather than aborting the whole run — but that means
+// `checkCodePropsDrift` only ever sees the successfully-extracted files, so `--fail-on-stale`
+// (and therefore `check`) could exit 0 purely because nothing among the *successful* extractions
+// drifted, even though a file failed to parse at all. Extraction errors must independently fail
+// the `--fail-on-stale`/`check` path's exit code, regardless of what `checkCodePropsDrift` finds.
+async function testCheckFailsOnExtractionErrorEvenWithoutDrift() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fcr-check-extract-err-'));
+  const uiDir = path.join(dir, 'ui');
+  fs.mkdirSync(uiDir, { recursive: true });
+  fs.copyFileSync(
+    path.join(__dirname, 'fixtures/vue3/Broken.vue'),
+    path.join(uiDir, 'Broken.vue'),
+  );
+  fs.writeFileSync(
+    path.join(uiDir, 'Good.vue'),
+    '<script setup lang="ts">defineProps<{ size: string }>()</script><template><div /></template>',
+  );
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ dependencies: { vue: '^3.5.0' } }));
+  // Deliberately no registry/ dir at all: checkCodePropsDrift finds zero stale entries among
+  // the successfully-extracted files (Good.vue), since there's nothing on disk to compare
+  // against — isolating the assertion to extractionErrors alone driving the exit code.
+  const cachePath = path.join(dir, '.figma', 'cache', 'code-props-cache.json');
+
+  let exitCode = 0;
+  const origExit = process.exit;
+  const logs = [];
+  const origLog = console.log;
+  const origError = console.error;
+  const origWarn = console.warn;
+  console.log = (...items) => logs.push(items.join(' '));
+  console.error = (...items) => logs.push(items.join(' '));
+  console.warn = (...items) => logs.push(items.join(' '));
+  process.exit = (code) => {
+    exitCode = code ?? 0;
+    throw new Error(`exit:${exitCode}`);
+  };
+  try {
+    await cmdExtractCode({
+      'ui-dir': uiDir,
+      'project-root': dir,
+      'code-cache': cachePath,
+      'fail-on-stale': true,
+    });
+  } catch (error) {
+    if (!String(error?.message ?? error).startsWith('exit:')) throw error;
+  } finally {
+    process.exit = origExit;
+    console.log = origLog;
+    console.error = origError;
+    console.warn = origWarn;
+  }
+
+  assert.strictEqual(
+    exitCode,
+    1,
+    `expected exit 1 due to extraction error alone (no codePropsMap drift possible here); logs:\n${logs.join('\n')}`,
+  );
+  assert.ok(
+    logs.some((line) => line.includes('extraction')),
+    `expected extraction-error failure mentioned in output; logs:\n${logs.join('\n')}`,
+  );
+  console.log('check fails on extraction error even without drift → PASS');
 }
 
 function loadSemanticFixture(name) {
@@ -1261,6 +1385,49 @@ async function testFinalizeReportsLockContentionCleanly() {
   console.log('finalize reports lock contention cleanly → PASS');
 }
 
+// Final whole-branch review finding 1: `recoverGroupsFromRegistry`'s throw (Task 7's
+// schemaVersion guard) was the one throw site inside `withRegistryLock`'s callback that Task 8
+// did NOT wrap in try/catch, unlike its two neighbors (`definitionsForMergedGroups`,
+// `toCodePropsMap`). A host project with a pre-existing schemaVersion-2 registry entry is
+// exactly the documented upgrade scenario, so it must fail with the same clean, component-scoped
+// message as its neighbors — not an uncaught stack trace out of `withRegistryLock`.
+async function testFinalizeReportsSchemaV2UpgradeCleanly() {
+  const { dir, cacheDir, registryDir } = stageFinalizeProject();
+  const registryPath = path.join(registryDir, 'ui', 'Button.json');
+  fs.mkdirSync(path.dirname(registryPath), { recursive: true });
+  fs.writeFileSync(
+    registryPath,
+    JSON.stringify({
+      schemaVersion: 2,
+      component: { exportName: 'Button', exportType: 'named', filePath: 'src/components/ui/button.tsx' },
+      figma: { componentPath: 'Button', lastKnownNodeId: '28:518' },
+      codePropsMap: { size: { type: 'enum', values: ['sm', 'lg'] } },
+      figmaBindings: [
+        {
+          path: 'Button > btn > Size',
+          figmaType: 'VARIANT',
+          mappingKind: 'direct',
+          prop: 'size',
+        },
+      ],
+    }),
+  );
+
+  const { exitCode, output } = await runFinalize({ 'cache-dir': cacheDir, 'project-root': dir });
+
+  assert.strictEqual(exitCode, 1, `expected exit 1; output:\n${output}`);
+  assert.ok(output.includes('❌ Button:'), `expected clean component-scoped error; output:\n${output}`);
+  assert.ok(
+    output.includes('schemaVersion 2, expected 3'),
+    `expected schemaVersion upgrade message; output:\n${output}`,
+  );
+  assert.ok(
+    !output.toLowerCase().includes('at object.<anonymous>') && !output.includes('.mjs:'),
+    `expected no raw stack trace; output:\n${output}`,
+  );
+  console.log('finalize reports schemaVersion v2 upgrade cleanly → PASS');
+}
+
 async function testFinalizeSameIdRename() {
   const { dir, cacheDir, registryDir } = stageFinalizeProject();
   const first = await runFinalize({ 'cache-dir': cacheDir, 'project-root': dir });
@@ -1548,6 +1715,7 @@ const tests = [
   testShapeBad,
   testCodePropsMapIncludesOnlyBoundProps,
   testCodePropsDriftIgnoresUnboundProps,
+  testCodeDriftRejectsSchemaV2EvenWithoutHashDrift,
   testCodeRawPreservesUncertainCandidates,
   testFigmaCollectPrunesVariantMembers,
   testParallelCacheMerge,
@@ -1576,6 +1744,7 @@ const tests = [
   testExtractVue3Sfc,
   testExtractVue3Command,
   testExtractCodeSkipsBrokenFileContinuesOthers,
+  testCheckFailsOnExtractionErrorEvenWithoutDrift,
   testSemanticGoodMatched,
   testSemanticUnknownProp,
   testSemanticValueCoverage,
@@ -1589,6 +1758,7 @@ const tests = [
   testFinalizeIncompatibleRename,
   testFinalizeReportsPropRemovalCleanly,
   testFinalizeReportsLockContentionCleanly,
+  testFinalizeReportsSchemaV2UpgradeCleanly,
   testFinalizeSameIdRename,
   testFinalizeDryRun,
   testFinalizeDryRunHasNoFilesystemSideEffects,

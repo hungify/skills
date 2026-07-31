@@ -174,12 +174,22 @@ async function cmdExtractCode(args) {
       registryRoot,
       sourceRoot,
     });
-    if (stale.length > 0) {
+    if (stale.length > 0 || extractionErrors.length > 0) {
       if (quiet) {
-        console.error(`❌ ${stale.length} stale registry codePropsMap(s) — run without --quiet for details`);
+        console.error(
+          `❌ ${stale.length} stale registry codePropsMap(s), ${extractionErrors.length} extraction error(s) — run without --quiet for details`,
+        );
       } else {
-        console.error(`❌ ${stale.length} stale registry codePropsMap(s):`);
-        stale.forEach((message) => console.error(`   - ${message}`));
+        if (stale.length > 0) {
+          console.error(`❌ ${stale.length} stale registry codePropsMap(s):`);
+          stale.forEach((message) => console.error(`   - ${message}`));
+        }
+        if (extractionErrors.length > 0) {
+          console.error(
+            `❌ ${extractionErrors.length} file(s) failed extraction (registry cannot be verified against current source):`,
+          );
+          extractionErrors.forEach((message) => console.error(`   - ${message}`));
+        }
       }
       process.exit(1);
     }

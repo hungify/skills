@@ -125,7 +125,15 @@ async function cmdFinalize(args) {
 
     const runBody = async () => {
       const existing = readExistingRegistry(outPath);
-      const existingGroups = existing ? recoverGroupsFromRegistry(existing, raw) : [];
+      let existingGroups;
+      try {
+        existingGroups = existing ? recoverGroupsFromRegistry(existing, raw) : [];
+      } catch (error) {
+        console.error(
+          `❌ ${component.codeComponent}: ${error instanceof Error ? error.message : error}`,
+        );
+        process.exit(1);
+      }
       const mergedGroups = mergeGroups(existingGroups, component.groups);
       const mergedCount = mergedGroups.length - component.groups.length;
       if (mergedCount > 0) {
