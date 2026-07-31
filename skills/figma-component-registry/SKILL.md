@@ -63,7 +63,7 @@ a preview or dry run.
 | --- | --- |
 | `.figma/cache/<task-id>/_figma-props-raw.json`, `_figma-props-matched.json` | Temporary isolated Figma-cycle artifacts — removed after successful `finalize`, retained after failure or `--dry-run` |
 | `.figma/cache/code-props-cache.json` | Only code-props artifact — one shared file for the whole repo |
-| `registry/<area>/<ExportName>.json` | Durable schema-v2 registry entry (one file per `exportName`) |
+| `registry/<area>/<ExportName>.json` | Durable schema-v3 registry entry (one file per `exportName`); writes are lock-serialized via a sibling `<file>.lock` |
 
 The shared code cache retains compact normalized public APIs keyed by framework, source
 path, source hash, and extractor version. Filtering is conservative: adapters remove
@@ -87,7 +87,9 @@ Derive one filesystem-safe `<task-id>` from `fileKey + sorted nodeIds + run-id` 
 
 **Identity vs hints:** `figma.componentPath` is the stable identity for a design-system component. `figma.lastKnownFileKey` and `figma.lastKnownNodeId` are cache hints only — they speed up re-fetch but do not define validity. Duplicating a Figma file into another account silently reassigns ids; the name breadcrumb survives.
 
-**Durable binding paths:** the `path` field on each `figmaBindings[]` entry strips `#digit:digit` suffixes from Figma property keys (e.g. `Show prepend#529:0` → `Button > btn > Show prepend`). Matched-cycle artifacts use raw `figmaProp` keys including the suffix.
+**Durable binding paths:** each `figmaBindings[]` entry carries structured `componentPath` / `groupName` / `propName` fields (schema v3). These, plus `figmaNodeId` when present, are the source of truth for a binding's group/prop identity — merge, carried-forward group recovery, and drift logic key off them. The `path` field is a derived, display-only label (`${componentPath} > ${groupName} > ${propName}`) that strips `#digit:digit` suffixes from Figma property keys (e.g. `Show prepend#529:0` → `Button > btn > Show prepend`); no code parses `path` back apart, so a component, group, or property name that itself contains `>` is safe. Matched-cycle artifacts use raw `figmaProp` keys including the suffix.
+
+**Registry write locking:** on the real (non-`--dry-run`) write path, `finalize` serializes concurrent writes to the same `registry/<area>/<ExportName>.json` through a sibling `<file>.lock` file, created on first use. `finalize --dry-run` never acquires this lock — dry-run has zero filesystem side effects (no `.lock` file, no registry directory created), so previews are always safe to run concurrently with anything. If the lock can't be acquired (real contention, e.g. another `finalize` process already holds it), the command reports a clean, expected failure — `❌ <ExportName>: could not acquire registry lock (<path>.lock); another finalize may be running` — and exits non-zero, instead of a raw stack trace. `.lock` files are harmless if committed but are safe (and recommended) to gitignore in the host project, e.g. `registry/**/*.lock`.
 
 **Optional `figmaNodeId` on bindings:** when one code component maps to multiple Figma component sets, include `figmaNodeId` on each binding so `verify-source` and carried-forward merge can recover the correct group without ambiguity.
 
@@ -137,6 +139,10 @@ There is **no** prune, unlink, delete, or registry-remove CLI. Passing `--prune`
   only those components can fail the command. Without `--components`, `check` fails on drift in
   any extracted component. `verify-source --components Button,Input` is unrelated and mandatory
   there — it does a live Figma re-check for those registry files specifically.
+- `extract-code` (and `check`, which runs it internally) no longer aborts the whole run when a
+  single source file fails to parse: it skips that file, continues extracting the rest, and
+  prints a `⚠️  N file(s) failed extraction and were skipped:` warning listing each failed file
+  and its error.
 
 ## Workflow
 
