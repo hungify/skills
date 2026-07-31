@@ -932,13 +932,16 @@ async function testFinalizeCarriedForwardMissing() {
 
 function testRecoverMultiGroupNodeIds() {
   const entry = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     component: { exportName: 'Button', exportType: 'named', filePath: 'ui/button.tsx' },
     figma: { componentPath: 'Button', lastKnownNodeId: '1:1' },
     codePropsMap: {},
     figmaBindings: [
       {
         path: 'Button > group-a > Size',
+        componentPath: 'Button',
+        groupName: 'group-a',
+        propName: 'Size',
         figmaNodeId: '1:1',
         figmaType: 'VARIANT',
         mappingKind: 'direct',
@@ -946,6 +949,9 @@ function testRecoverMultiGroupNodeIds() {
       },
       {
         path: 'Button > group-b > Label',
+        componentPath: 'Button',
+        groupName: 'group-b',
+        propName: 'Label',
         figmaNodeId: '1:2',
         figmaType: 'TEXT',
         mappingKind: 'direct',
@@ -967,6 +973,54 @@ function testRecoverMultiGroupNodeIds() {
   assert.strictEqual(byId.get('1:1')?.mappings.length, 1);
   assert.strictEqual(byId.get('1:2')?.mappings.length, 1);
   console.log('recover multi-group node ids → PASS');
+}
+
+function testRecoverGroupsSurvivesGtInName() {
+  const entry = {
+    schemaVersion: 3,
+    component: { exportName: 'Icon', exportType: 'named', filePath: 'ui/icon.tsx' },
+    figma: { componentPath: 'Icon', lastKnownNodeId: '1:1' },
+    codePropsMap: {},
+    figmaBindings: [
+      {
+        path: 'Icon > Icon > Leading',
+        componentPath: 'Icon',
+        groupName: 'Icon > Leading',
+        propName: 'Size',
+        figmaNodeId: '1:1',
+        figmaType: 'VARIANT',
+        mappingKind: 'direct',
+        prop: 'size',
+      },
+    ],
+  };
+  const raw = {
+    components: [
+      { name: 'Icon > Leading', figmaNodeId: '1:1', propertyDefinitions: { Size: {} } },
+    ],
+  };
+  const groups = recoverGroupsFromRegistry(entry, raw);
+  assert.strictEqual(groups.length, 1);
+  assert.strictEqual(groups[0].name, 'Icon > Leading');
+  assert.strictEqual(groups[0].mappings[0].figmaProp, 'Size');
+  console.log('recover groups survives > in group name → PASS');
+}
+
+function testRecoverGroupsRejectsOldSchemaVersion() {
+  const oldEntry = {
+    schemaVersion: 2,
+    component: { exportName: 'Button', exportType: 'named', filePath: 'ui/button.tsx' },
+    figma: { componentPath: 'Button', lastKnownNodeId: '1:1' },
+    codePropsMap: {},
+    figmaBindings: [
+      { path: 'Button > btn > Size', figmaType: 'VARIANT', mappingKind: 'direct', prop: 'size' },
+    ],
+  };
+  assert.throws(
+    () => recoverGroupsFromRegistry(oldEntry, { components: [] }),
+    /schemaVersion 2, expected 3/,
+  );
+  console.log('recover groups rejects old schemaVersion → PASS');
 }
 
 async function testFinalizeIncompatibleRename() {
@@ -1311,6 +1365,8 @@ const tests = [
   testRegistryLookupFindsUniqueMatch,
   testRegistryLookupFailsLoudOnCollision,
   testRecoverMultiGroupNodeIds,
+  testRecoverGroupsSurvivesGtInName,
+  testRecoverGroupsRejectsOldSchemaVersion,
   testMappingPropsResolveReportsAllMissing,
   testFailOnStaleCodePropsMap,
   testExtractCodeCommand,
