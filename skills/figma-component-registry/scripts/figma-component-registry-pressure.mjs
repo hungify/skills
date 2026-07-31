@@ -16,6 +16,7 @@ import { collectComponents } from './lib/domain/figma-collect.mjs';
 import { flattenGroupsToBindings, mapKind } from './lib/domain/flatten-bindings.mjs';
 import { mergeGroups } from './lib/domain/merge-groups.mjs';
 import { recoverGroupsFromRegistry } from './lib/domain/recover-groups.mjs';
+import { findRegistryEntryByExportName } from './lib/domain/registry-lookup.mjs';
 import { stripFigmaPropId, bindingPath } from './lib/domain/path-normalize.mjs';
 import { registryFilePath } from './lib/domain/registry-path.mjs';
 import { loadExtractor } from './lib/extractors/index.mjs';
@@ -387,6 +388,37 @@ function testRegistryPathRejectsTraversalExportName() {
     /invalid exportName/,
   );
   console.log('registry path rejects traversal exportName → PASS');
+}
+
+function testRegistryLookupFindsUniqueMatch() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fcr-lookup-'));
+  const uiPath = path.join(dir, 'registry', 'ui', 'Button.json');
+  fs.mkdirSync(path.dirname(uiPath), { recursive: true });
+  fs.writeFileSync(uiPath, JSON.stringify({ component: { exportName: 'Button' } }));
+
+  const found = findRegistryEntryByExportName(dir, 'registry', 'Button');
+  assert.ok(found, 'expected a match');
+  assert.strictEqual(found.filePath, uiPath);
+  console.log('registry lookup finds unique match → PASS');
+}
+
+function testRegistryLookupFailsLoudOnCollision() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fcr-lookup-collision-'));
+  const uiPath = path.join(dir, 'registry', 'ui', 'Button.json');
+  const marketingPath = path.join(dir, 'registry', 'marketing', 'Button.json');
+  fs.mkdirSync(path.dirname(uiPath), { recursive: true });
+  fs.mkdirSync(path.dirname(marketingPath), { recursive: true });
+  fs.writeFileSync(uiPath, JSON.stringify({ component: { exportName: 'Button' } }));
+  fs.writeFileSync(marketingPath, JSON.stringify({ component: { exportName: 'Button' } }));
+
+  assert.throws(
+    () => findRegistryEntryByExportName(dir, 'registry', 'Button'),
+    (error) =>
+      /ambiguous exportName "Button"/.test(error.message) &&
+      error.message.includes('ui/Button.json') &&
+      error.message.includes('marketing/Button.json'),
+  );
+  console.log('registry lookup fails loud on exportName collision → PASS');
 }
 
 function testMergeGroups() {
@@ -1203,6 +1235,8 @@ const tests = [
   testRegistryPath,
   testRegistryPathRejectsTraversalExportName,
   testMergeGroups,
+  testRegistryLookupFindsUniqueMatch,
+  testRegistryLookupFailsLoudOnCollision,
   testRecoverMultiGroupNodeIds,
   testFailOnStaleCodePropsMap,
   testExtractCodeCommand,

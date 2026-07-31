@@ -14,6 +14,7 @@ function findRegistryEntryByExportName(projectRoot, registryRoot, exportName) {
   const root = path.join(projectRoot, registryRoot);
   if (!fs.existsSync(root)) return null;
 
+  const matches = [];
   const stack = [root];
   while (stack.length > 0) {
     const dir = stack.pop();
@@ -27,13 +28,21 @@ function findRegistryEntryByExportName(projectRoot, registryRoot, exportName) {
       try {
         const parsed = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
         if (parsed?.component?.exportName === exportName) {
-          return { filePath: fullPath, entry: parsed };
+          matches.push({ filePath: fullPath, entry: parsed });
         }
       } catch {
         // skip unreadable registry files
       }
     }
   }
-  return null;
+
+  if (matches.length > 1) {
+    const relPaths = matches.map((match) => path.relative(root, match.filePath)).sort();
+    throw new Error(
+      `ambiguous exportName "${exportName}" matches ${matches.length} registry files: ${relPaths.join(', ')} — disambiguate with a full registry path`,
+    );
+  }
+
+  return matches[0] ?? null;
 }
 export { readExistingRegistry, findRegistryEntryByExportName };
