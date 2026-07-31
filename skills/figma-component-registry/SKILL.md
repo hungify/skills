@@ -1,32 +1,26 @@
 ---
 name: figma-component-registry
 description: >-
-  Use when syncing or validating Figma design-system component props against
-  React or Vue 3 APIs, generating registry entries, investigating stale bindings,
-  or running figma-component-registry commands.
-when_to_use: |
-  Trigger on: "does <Component> still match its Figma variant", "the <Component> mapping
-  looks broken/stale again", "sync figma props for X", "why is the component-registry
-  check failing", "regenerate the registry entry for X", "fetch the latest figma nodes
-  for <fileKey>". Do NOT trigger for general Figma design/visual questions unrelated to
-  code props, or requests to hand-edit a registry/*.json file directly (point to the CLI
-  instead).
+  Use whenever the user asks whether a component's props still match its Figma
+  design, wants to sync/regenerate a registry/AREA/EXPORT_NAME.json entry,
+  reports a stale or failing component-registry check, or shares a Figma
+  component URL alongside a request to add/update it — even if they don't say
+  "sync," "registry," or name this skill explicitly (e.g. "does Button still
+  match Figma," "why is CI failing on the Checkbox check," "add this Figma
+  component to our system," "the loading prop needs a Figma binding"). Also
+  trigger for direct fetch/extract-code/finalize/check/verify-source
+  figma-component-registry commands. Do NOT trigger for general Figma
+  visual/design questions with no code-props intent, or requests to hand-edit
+  a registry/*.json file directly (point to the CLI instead).
 allowed-tools: >-
   Bash(node ${CLAUDE_SKILL_DIR}/scripts/figma-component-registry.mjs *)
-paths:
-  - "registry/**"
-  - "src/components/**"
 ---
 
-> **Version note:** `${CLAUDE_SKILL_DIR}` substitution and `when_to_use` require Claude Code
-> v2.1.129+; `${CLAUDE_PROJECT_DIR}` substitution requires v2.1.196+. On older releases these
-> fields are silently ignored — not an error — so commands just fall back to asking permission
-> each time. `allowed-tools` only pre-approves the matching Bash command **for the turn that
-> invokes this skill**; the grant clears on your next message, so it does not replace a
-> standing permission rule if you want the CLI fully unprompted for a whole session. The
-> PostToolUse drift-warning hook lives in `hooks/hooks.json` (this skill is also a plugin —
-> see below); plugin hooks load at session start and need `/reload-plugins` after any edit,
-> unlike `SKILL.md` text which updates live.
+> **Host note:** resolve `<skill-dir>` to the absolute directory containing this `SKILL.md`.
+> Claude Code exposes that path as `${CLAUDE_SKILL_DIR}` on v2.1.129+; other hosts should use
+> the loaded skill path directly. `allowed-tools` only pre-approves the matching Claude Code
+> command for the turn that invokes this skill. Figloom plugin installs add host-specific drift
+> hooks; standalone skills.sh installs do not install plugin hooks.
 
 # Figma Component Registry
 
@@ -63,7 +57,7 @@ a preview or dry run.
 | --- | --- |
 | `.figma/cache/<task-id>/_figma-props-raw.json`, `_figma-props-matched.json` | Temporary isolated Figma-cycle artifacts — removed after successful `finalize`, retained after failure or `--dry-run` |
 | `.figma/cache/code-props-cache.json` | Only code-props artifact — one shared file for the whole repo |
-| `registry/<area>/<ExportName>.json` | Durable schema-v2 registry entry (one file per `exportName`) |
+| `registry/<area>/<ExportName>.json` | Durable schema-v3 registry entry (one file per `exportName`); writes are lock-serialized via a sibling `<file>.lock` |
 
 The shared code cache retains compact normalized public APIs keyed by framework, source
 path, source hash, and extractor version. Filtering is conservative: adapters remove
@@ -85,9 +79,11 @@ Derive one filesystem-safe `<task-id>` from `fileKey + sorted nodeIds + run-id` 
 
 `code-props-cache.json` is independent of `fileKey`, `nodeIds`, and `run-id`. Never pass `--code-cache` yourself; it exists only for the pressure-test suite.
 
-**Identity vs hints:** `figma.componentPath` is the stable identity for a design-system component. `figma.lastKnownFileKey` and `figma.lastKnownNodeId` are cache hints only — they speed up re-fetch but do not define validity. Duplicating a Figma file into another account silently reassigns ids; the name breadcrumb survives.
+**Identity label vs fetch target:** `figma.componentPath` is the stable *display* identity for a design-system component — it names the binding paths (`${componentPath} > ${groupName} > ${propName}`) and never drives a Figma API call. `figma.lastKnownFileKey` is not a mere cache hint: it is the literal fetch target `verify-source`'s live re-check and `finalize`'s re-fetch of carried-forward groups (groups not covered by the current cycle) both read from. If it's wrong or stale, those operations fetch the wrong file — reporting live groups as falsely missing, or (before the fileKey-consistency guard) silently mixing groups from two file identities into one entry. `finalize` refreshes it automatically on every successful run; never hand-edit it. `figma.lastKnownNodeId` is a narrower fallback, used only when `recoverGroupsFromRegistry` meets a binding that predates schema v3's `figmaNodeId` field and name-based lookup also fails. Duplicating a Figma file (an actual copy — not moving or transferring the same file to another team/account, which keeps the original file's link/key per Figma's own docs) creates a new file with a new file key — the old key stops resolving to that design. `componentPath` is what survives a re-point like this and re-anchors identity; `lastKnownFileKey`/`lastKnownNodeId` do not — one more reason `finalize` now fails loud instead of merging across a fileKey mismatch, since a wrong fileKey is otherwise indistinguishable from an operator pointing `fetch` at a stale/typo'd key.
 
-**Durable binding paths:** the `path` field on each `figmaBindings[]` entry strips `#digit:digit` suffixes from Figma property keys (e.g. `Show prepend#529:0` → `Button > btn > Show prepend`). Matched-cycle artifacts use raw `figmaProp` keys including the suffix.
+**Durable binding paths:** each `figmaBindings[]` entry carries structured `componentPath` / `groupName` / `propName` fields (schema v3). These, plus `figmaNodeId` when present, are the source of truth for a binding's group/prop identity — merge, carried-forward group recovery, and drift logic key off them. The `path` field is a derived, display-only label (`${componentPath} > ${groupName} > ${propName}`) that strips `#digit:digit` suffixes from Figma property keys (e.g. `Show prepend#529:0` → `Button > btn > Show prepend`); no code parses `path` back apart, so a component, group, or property name that itself contains `>` is safe. Matched-cycle artifacts use raw `figmaProp` keys including the suffix.
+
+**Registry write locking:** on the real (non-`--dry-run`) write path, `finalize` serializes concurrent writes to the same `registry/<area>/<ExportName>.json` through a sibling `<file>.lock` file, created on first use. `finalize --dry-run` never acquires this lock — dry-run has zero filesystem side effects (no `.lock` file, no registry directory created), so previews are always safe to run concurrently with anything. If the lock can't be acquired (real contention, e.g. another `finalize` process already holds it), the command reports a clean, expected failure — `ERROR: <ExportName>: could not acquire registry lock (<path>.lock); another finalize may be running` — and exits non-zero, instead of a raw stack trace. `.lock` files are harmless if committed but are safe (and recommended) to gitignore in the host project, e.g. `registry/**/*.lock`.
 
 **Optional `figmaNodeId` on bindings:** when one code component maps to multiple Figma component sets, include `figmaNodeId` on each binding so `verify-source` and carried-forward merge can recover the correct group without ambiguity.
 
@@ -108,21 +104,23 @@ be read directly. This is a standing rule for the whole session, not a one-time 
 Direct CLI — use this exact form so `allowed-tools` pre-approval applies:
 
 ```bash
-node ${CLAUDE_SKILL_DIR}/scripts/figma-component-registry.mjs fetch --cache-dir .figma/cache/<task-id> --file-key <key> --node-ids <ids>
-node ${CLAUDE_SKILL_DIR}/scripts/figma-component-registry.mjs extract-code --ui-dir src/components
+node <skill-dir>/scripts/figma-component-registry.mjs fetch --cache-dir .figma/cache/<task-id> --file-key <key> --node-ids <ids>
+node <skill-dir>/scripts/figma-component-registry.mjs extract-code --ui-dir src/components
 # agent writes .figma/cache/<task-id>/_figma-props-matched.json
-node ${CLAUDE_SKILL_DIR}/scripts/figma-component-registry.mjs finalize --cache-dir .figma/cache/<task-id>
-node ${CLAUDE_SKILL_DIR}/scripts/figma-component-registry.mjs check
-node ${CLAUDE_SKILL_DIR}/scripts/figma-component-registry.mjs check --components Button,Input
-node ${CLAUDE_SKILL_DIR}/scripts/figma-component-registry.mjs verify-source --components Button,Input
+node <skill-dir>/scripts/figma-component-registry.mjs finalize --cache-dir .figma/cache/<task-id>
+node <skill-dir>/scripts/figma-component-registry.mjs check
+node <skill-dir>/scripts/figma-component-registry.mjs check --components Button,Input
+node <skill-dir>/scripts/figma-component-registry.mjs verify-source --components Button,Input
 ```
 
 If the host project has wired `pnpm figma-component-registry:*` scripts in its own
 `package.json` to the CLI above, those work identically — but they are the host
 project's convenience aliases, not something this skill ships, so don't assume they
-exist. `${CLAUDE_SKILL_DIR}/scripts/package.json` only declares this CLI's own
-dependencies (`ajv`, `react-docgen-typescript`, `vue-component-meta`, …); run its test suite directly with
-`node ${CLAUDE_SKILL_DIR}/scripts/figma-component-registry-pressure.mjs`.
+exist. Managed Figloom bundles ship a self-contained CLI entry and need no dependency install.
+For an editable skills.sh copy, run `npm ci --prefix <skill-dir>/scripts` once when
+`<skill-dir>/scripts/node_modules` is absent. The package declares only this CLI's dependencies
+(`ajv`, `react-docgen-typescript`, `vue-component-meta`, and related packages). Run its test suite
+directly with `node <skill-dir>/scripts/figma-component-registry-tests.mjs`.
 
 There is **no** prune, unlink, delete, or registry-remove CLI. Passing `--prune` exits with an error.
 
@@ -133,10 +131,20 @@ There is **no** prune, unlink, delete, or registry-remove CLI. Passing `--prune`
 - `fetch` / `extract-code` / `check` `--verbose` — print extra detail to stderr (node/component
   counts, cache hit/miss).
 - `check --components Button,Input` — still extracts the full `--ui-dir` (needed to keep the
-  shared code-cache correct) but scopes the *drift check itself* to the named `exportName`s, so
-  only those components can fail the command. Without `--components`, `check` fails on drift in
-  any extracted component. `verify-source --components Button,Input` is unrelated and mandatory
-  there — it does a live Figma re-check for those registry files specifically.
+  shared code-cache correct) but scopes the *codePropsMap drift check* to the named
+  `exportName`s, so only those components can fail the command **on drift**. An extraction
+  error anywhere under `--ui-dir` still fails the command regardless of `--components` — an
+  incomplete code cache can't verify anything, scoped or not. Without `--components`, `check`
+  fails on drift in any extracted component. `verify-source --components Button,Input` is
+  unrelated and mandatory there — it does a live Figma re-check for those registry files
+  specifically.
+- `extract-code` no longer aborts the whole run when a single source file fails to parse: it
+  skips that file, continues extracting the rest, and prints a
+  `WARN: N file(s) failed extraction and were skipped:` warning listing each failed file and its
+  error — plain `extract-code` still exits 0. `check` (which runs the same extraction
+  internally with `--fail-on-stale`) treats any extraction error as a failure and exits
+  non-zero, on top of its usual drift check — an unparseable file means the registry can't be
+  verified, not just that it wasn't found stale.
 
 ## Workflow
 
@@ -176,7 +184,7 @@ component APIs to the same `type` / `values` shape before matching.
 | `bundle` | `props`, `valueProps` | One Figma value assigns several code props at once |
 | `composition` | `note`; no `prop` | Expressed through children, slots, icons, or parent composition |
 | `unsupported` | `note`; no `prop` | No code representation in the current API |
-| `static` | `note`; no `prop` | Figma node has zero `componentPropertyDefinitions` — records node↔code correspondence only |
+| `static` | `note`; no `prop` | Figma node has zero `componentPropertyDefinitions` — records node-to-code correspondence only |
 
 Use `figmaProp` `"__no_properties__"`, `figmaType` `"COMPONENT"`, and a `note` for `static` groups.
 

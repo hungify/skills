@@ -1,0 +1,27 @@
+{
+  "name": "figloom",
+  "displayName": "Figloom",
+  "version": "0.1.0",
+  "description": "Figma component registry synchronization and drift detection workflows.",
+  "author": {
+    "name": "hungify",
+    "email": "nmhungify@gmail.com"
+  },
+  "publisher": "hungify",
+  "homepage": "https://github.com/hungify/skills#figloom",
+  "repository": "https://github.com/hungify/skills",
+  "license": "MIT",
+  "keywords": [
+    "figma",
+    "component-registry",
+    "design-to-code"
+  ],
+  "category": "developer-tools",
+  "tags": [
+    "figma",
+    "components",
+    "registry"
+  ],
+  "skills": "./skills/",
+  "hooks": "./hooks/cursor-hooks.json"
+}

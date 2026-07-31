@@ -61,13 +61,13 @@ function isolatedCacheDir(args, command) {
   const cacheDir = args['cache-dir'];
   if (typeof cacheDir !== 'string' || cacheDir.trim().length === 0) {
     console.error(
-      `❌ ${command} requires isolated --cache-dir <path>; reuse the same path for one fetch/extract/finalize cycle`,
+      `ERROR: ${command} requires isolated --cache-dir <path>; reuse the same path for one fetch/extract/finalize cycle`,
     );
     process.exit(1);
   }
   if (path.resolve(cacheDir) === path.resolve(SHARED_CACHE_DIR)) {
     console.error(
-      `❌ Shared cache ${SHARED_CACHE_DIR} is forbidden; use ${SHARED_CACHE_DIR}/<task-id>`,
+      `ERROR: Shared cache ${SHARED_CACHE_DIR} is forbidden; use ${SHARED_CACHE_DIR}/<task-id>`,
     );
     process.exit(1);
   }
@@ -84,6 +84,11 @@ function hashContent(source) {
 
 function hashJson(value) {
   return hashContent(JSON.stringify(value));
+}
+
+function isPathUnderDir(filePath, dir) {
+  const relative = path.relative(path.resolve(dir), path.resolve(filePath));
+  return relative !== '' && relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
 }
 
 function walkComponentFiles(dir, extensions) {
@@ -105,4 +110,4 @@ function walkComponentFiles(dir, extensions) {
   }
   return results;
 }
-export { SHARED_CACHE_DIR, DEFAULT_UI_DIR, CODE_CACHE_NAME, cachePaths, isolatedCacheDir, loadDotEnv, findProjectRoot, getFigmaToken, nowIso, hashContent, hashJson, walkComponentFiles };
+export { SHARED_CACHE_DIR, DEFAULT_UI_DIR, CODE_CACHE_NAME, cachePaths, isolatedCacheDir, loadDotEnv, findProjectRoot, getFigmaToken, nowIso, hashContent, hashJson, isPathUnderDir, walkComponentFiles };

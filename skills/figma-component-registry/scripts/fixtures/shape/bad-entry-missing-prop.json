@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "component": {
     "exportName": "Button",
     "exportType": "named",
@@ -16,6 +16,9 @@
   "figmaBindings": [
     {
       "path": "Button > btn > Size",
+      "componentPath": "Button",
+      "groupName": "btn",
+      "propName": "Size",
       "figmaType": "VARIANT",
       "mappingKind": "direct",
       "valueMap": { "Small": "sm", "Regular": "md" }

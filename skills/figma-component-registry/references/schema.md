@@ -1,8 +1,10 @@
-# Registry schema v2
+# Registry schema v3
 
-Only schema v2 is accepted. The agent writes `_figma-props-matched.json`; `finalize` validates it and upserts `registry/<area>/<ExportName>.json`.
+Only schema v3 is accepted. The agent writes `_figma-props-matched.json`; `finalize` validates it and upserts `registry/<area>/<ExportName>.json`.
 
 Durable entries use flattened `figmaBindings[]` (not nested `groups[]`). Matched cycle artifacts use grouped `mappings[]` with raw `figmaProp` keys.
+
+`figma.componentPath` is a display identity only (never used to fetch). `figma.lastKnownFileKey` is a functional fetch target — `verify-source` and `finalize`'s carried-forward re-fetch both read live Figma data from it, so a stale/wrong value breaks those, not just caching. See SKILL.md's "Identity label vs fetch target" section for the full explanation.
 
 ## Durable registry entry (all five mapping kinds)
 
@@ -10,7 +12,7 @@ Path on disk: `registry/ui/Checkbox.json` (derived from `component.filePath` + `
 
 ```json
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "component": {
     "exportName": "Checkbox",
     "exportType": "named",
@@ -29,17 +31,23 @@ Path on disk: `registry/ui/Checkbox.json` (derived from `component.filePath` + `
   "figmaBindings": [
     {
       "path": "Checkbox > Checkbox > Size",
-      "figmaNodeId": "28:518",
+      "componentPath": "Checkbox",
+      "groupName": "Checkbox",
+      "propName": "Size",
       "figmaType": "VARIANT",
       "mappingKind": "direct",
+      "figmaNodeId": "28:518",
       "prop": "size",
       "valueMap": { "Small": "sm", "Regular": "md" }
     },
     {
       "path": "Checkbox > Checkbox > Checked?",
-      "figmaNodeId": "28:518",
+      "componentPath": "Checkbox",
+      "groupName": "Checkbox",
+      "propName": "Checked?",
       "figmaType": "VARIANT",
       "mappingKind": "bundle",
+      "figmaNodeId": "28:518",
       "props": ["checked", "indeterminate"],
       "valueProps": {
         "True": { "checked": true, "indeterminate": false },
@@ -49,28 +57,39 @@ Path on disk: `registry/ui/Checkbox.json` (derived from `component.filePath` + `
     },
     {
       "path": "Checkbox > Checkbox > Show prepend",
-      "figmaNodeId": "28:518",
+      "componentPath": "Checkbox",
+      "groupName": "Checkbox",
+      "propName": "Show prepend",
       "figmaType": "BOOLEAN",
       "mappingKind": "composition",
+      "figmaNodeId": "28:518",
       "note": "No visibility toggle prop; presence is implicit from whether an icon child is passed."
     },
     {
       "path": "Checkbox > Checkbox > Legacy axis",
-      "figmaNodeId": "28:518",
+      "componentPath": "Checkbox",
+      "groupName": "Checkbox",
+      "propName": "Legacy axis",
       "figmaType": "VARIANT",
       "mappingKind": "unsupported",
+      "figmaNodeId": "28:518",
       "note": "Figma variant exists but code API has no corresponding prop."
     },
     {
       "path": "Checkbox > Checkbox SP > __no_properties__",
-      "figmaNodeId": "99:1",
+      "componentPath": "Checkbox",
+      "groupName": "Checkbox SP",
+      "propName": "__no_properties__",
       "figmaType": "COMPONENT",
       "mappingKind": "static",
+      "figmaNodeId": "99:1",
       "note": "Dedicated SP-only frame with no variant axis; maps to same Checkbox export."
     }
   ]
 }
 ```
+
+`componentPath` (the export name a binding belongs to), `groupName` (the owning Figma group/component-set name), and `propName` (the Figma property key with any `#digit:digit` suffix stripped) are the structured source of truth for a binding's identity — `recoverGroupsFromRegistry`, merge, and drift logic key off these fields, plus `figmaNodeId` when present. `path` is only `${componentPath} > ${groupName} > ${propName}` joined for human readability; no code parses it back apart, so a component, group, or property name that itself contains `>` is safe and does not break anything.
 
 `codePropsMap` is binding-scoped, not a dump of the complete framework component API.
 Its keys are exactly the unique props referenced by `direct.prop` and
@@ -161,7 +180,7 @@ Mappings belong to a Figma group. The same property name in two component sets t
 | `bundle` | `props`, `valueProps` | One Figma value → partial prop object |
 | `composition` | `note`; no `prop` | Children, slots, icons, parent composition |
 | `unsupported` | `note`; no `prop` | Unsupported by current code API |
-| `static` | `note`; no `prop` | Zero Figma properties; node↔code correspondence only |
+| `static` | `note`; no `prop` | Zero Figma properties; node-to-code correspondence only |
 
 `null` values in `valueMap` or inside `valueProps` objects mean omit that code prop.
 
@@ -173,9 +192,14 @@ redundant. If sets differ semantically or code domain is unknown, provide comple
 
 `composition`, `unsupported`, and `static` always require a concise `note`. They fail semantic validation when a normalized Figma property name exactly matches a locally extracted code prop with known type.
 
+## Ambiguous `exportName` across areas
+
+`verify-source --components <ExportName-or-registry-path,...>` resolves a bare export by scanning every `registry/<area>/*.json` file and matching on `component.exportName` (`check --components` instead derives the registry path directly from each extracted source file). If two or more registry files across different areas share the same `exportName` — e.g. `registry/ui/Button.json` and `registry/marketing/Button.json` both have `"exportName": "Button"` — the lookup fails loud instead of silently picking one and lists every matching relative path. Disambiguate with a registry-relative path such as `verify-source --components ui/Button.json`; `registry/ui/Button.json` and an absolute registry-file path are also accepted.
+
 ## Finalize rejects
 
-- any schema version other than 2;
+- a matched-artifact `schemaVersion` other than 2 (the matched cycle artifact schema is unchanged; only the durable registry entry schema moved to v3);
+- an *existing* durable registry entry with `schemaVersion` other than 3 — there is no v2 → v3 auto-migration. `finalize` must read an existing entry before it can merge and rewrite it, so re-running `fetch → finalize` against an old entry fails the same way every time; the fix is to delete the stale `registry/<area>/<ExportName>.json` file first, then re-run `fetch → finalize` to regenerate it from scratch. `check`/`extract-code --fail-on-stale` reject the same old entries as stale for the same reason;
 - missing/unknown fields, mapping kinds, code props, or Figma properties;
 - Figma property type drift;
 - incomplete or extra Figma value coverage;

@@ -1,21 +1,21 @@
+import path from 'path';
 import { stripFigmaPropId } from '../domain/path-normalize.mjs';
 import { recoverGroupsFromRegistry } from '../domain/recover-groups.mjs';
 import { fetchDefinitionGroups } from '../domain/definitions-for-merged-groups.mjs';
 import { validateRegistryEntry } from '../validate/shape.mjs';
-import { findRegistryEntryByExportName } from '../domain/registry-lookup.mjs';
+import { buildExportNameIndex, resolveFromIndex } from '../domain/registry-lookup.mjs';
 import { findProjectRoot, getFigmaToken } from '../paths.mjs';
 
 function mappingPropsResolve(group, propertyDefinitions) {
+  const missing = [];
+  const keys = Object.keys(propertyDefinitions ?? {});
   for (const mapping of group.mappings ?? []) {
-    const keys = Object.keys(propertyDefinitions ?? {});
     const found = keys.some(
       (key) => key === mapping.figmaProp || stripFigmaPropId(key) === stripFigmaPropId(mapping.figmaProp),
     );
-    if (!found) {
-      return mapping.figmaProp;
-    }
+    if (!found) missing.push(mapping.figmaProp);
   }
-  return null;
+  return missing;
 }
 
 async function cmdVerifySource(args) {
@@ -24,7 +24,7 @@ async function cmdVerifySource(args) {
     .map((value) => value.trim())
     .filter(Boolean);
   if (requested.length === 0) {
-    console.error('❌ Need --components Button,Input');
+    console.error('ERROR: Need --components Button,Input');
     process.exit(1);
   }
 
@@ -32,12 +32,14 @@ async function cmdVerifySource(args) {
   const registryRoot = args['registry-root'] || 'registry';
   const token = getFigmaToken();
   if (!token && !args.fetchDefinitionGroups) {
-    console.error('❌ Missing FIGMA_ACCESS_TOKEN in .env');
+    console.error('ERROR: Missing FIGMA_ACCESS_TOKEN in .env');
     process.exit(1);
   }
 
+  const registryRootAbs = path.join(projectRoot, registryRoot);
+  const registryIndex = buildExportNameIndex(projectRoot, registryRoot);
   const maps = requested.map((exportName) => {
-    const found = findRegistryEntryByExportName(projectRoot, registryRoot, exportName);
+    const found = resolveFromIndex(registryIndex, registryRootAbs, exportName);
     if (!found) {
       throw new Error(`registry entry missing for export ${exportName}`);
     }
@@ -93,21 +95,21 @@ async function cmdVerifySource(args) {
         );
       }
 
-      const missingProp = mappingPropsResolve(group, current.propertyDefinitions);
-      if (missingProp) {
+      const missingProps = mappingPropsResolve(group, current.propertyDefinitions);
+      if (missingProps.length > 0) {
         stale.push(
-          `${exportName}: mapping prop "${missingProp}" missing from live Figma definitions for ${group.name}`,
+          `${exportName}: mapping prop(s) "${missingProps.join('", "')}" missing from live Figma definitions for ${group.name}`,
         );
       }
     }
   }
 
   if (stale.length > 0) {
-    console.error('❌ Stale Figma registry sources:');
+    console.error('ERROR: Stale Figma registry sources:');
     stale.forEach((problem) => console.error(`   - ${problem}`));
     process.exit(1);
   }
 
-  console.log(`✅ Current Figma definitions match ${maps.length} registry file(s)`);
+  console.log(`OK: Current Figma definitions match ${maps.length} registry file(s)`);
 }
 export { cmdVerifySource, mappingPropsResolve };

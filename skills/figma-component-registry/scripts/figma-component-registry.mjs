@@ -36,7 +36,7 @@ async function main() {
   const run = commands[command];
   if (!run) {
     console.error(
-      `❌ Unknown command "${command ?? ''}". Use: fetch | extract-code | finalize | check | verify-source`,
+      `ERROR: Unknown command "${command ?? ''}". Use: fetch | extract-code | finalize | check | verify-source`,
     );
     process.exit(1);
   }
@@ -44,6 +44,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error(`❌ ${err.stack || err.message || err}`);
+  console.error(`ERROR: ${err.stack || err.message || err}`);
   process.exit(1);
 });

@@ -11,11 +11,11 @@ import {
 async function cmdFetch(args) {
   const token = getFigmaToken();
   if (!token) {
-    console.error('❌ Missing FIGMA_ACCESS_TOKEN in .env');
+    console.error('ERROR: Missing FIGMA_ACCESS_TOKEN in .env');
     process.exit(1);
   }
   if (!args['file-key'] || !args['node-ids']) {
-    console.error('❌ Need --file-key and --node-ids');
+    console.error('ERROR: Need --file-key and --node-ids');
     process.exit(1);
   }
 
@@ -39,7 +39,7 @@ async function cmdFetch(args) {
   }
 
   if (components.length === 0) {
-    console.warn('⚠️  No COMPONENT/COMPONENT_SET found in given node(s)');
+    console.warn('WARN: No COMPONENT/COMPONENT_SET found in given node(s)');
   }
 
   ensureDir(paths.cacheDir);
@@ -51,7 +51,7 @@ async function cmdFetch(args) {
 
   const verbose = args.verbose === true || args.verbose === 'true';
 
-  console.log(`✅ Fetch ${components.length} → ${paths.raw}`);
+  console.log(`OK: Fetch ${components.length} → ${paths.raw}`);
   let variantWarnings = 0;
   let staticCount = 0;
   for (const c of components) {
@@ -60,7 +60,7 @@ async function cmdFetch(args) {
 
     if (propCount === 0 && c.type === 'COMPONENT' && looksLikeVariantMemberName(c.name)) {
       suffix =
-        ' ⚠️  name looks like a variant member (Prop=Value, ...) — fetch its COMPONENT_SET parent instead, do not mark structural';
+        ' WARN: name looks like a variant member (Prop=Value, ...) — fetch its COMPONENT_SET parent instead, do not mark structural';
       variantWarnings++;
     } else if (propCount === 0) {
       suffix = ' (static — use mappingKind: static)';

@@ -1,17 +1,19 @@
+import * as reactTypescript from './react-typescript.mjs';
+import * as vue from './vue.mjs';
+
 const FRAMEWORK_TO_EXTRACTOR = {
-  react: './react-typescript.mjs',
-  vue: './vue.mjs',
+  react: reactTypescript,
+  vue,
 };
 
 async function loadExtractor(framework) {
-  const file = FRAMEWORK_TO_EXTRACTOR[framework];
-  if (!file) throw new Error(`Unknown framework "${framework}"`);
-  const mod = await import(new URL(file, import.meta.url).href);
+  const mod = FRAMEWORK_TO_EXTRACTOR[framework];
+  if (!mod) throw new Error(`Unknown framework "${framework}"`);
   if (typeof mod.extractComponents !== 'function') {
-    throw new Error(`${file} must export extractComponents(absPath)`);
+    throw new Error(`${framework} extractor must export extractComponents(absPath)`);
   }
   if (!Array.isArray(mod.fileExtensions) || mod.fileExtensions.length === 0) {
-    throw new Error(`${file} must export non-empty fileExtensions`);
+    throw new Error(`${framework} extractor must export non-empty fileExtensions`);
   }
   return mod;
 }

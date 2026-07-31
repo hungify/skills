@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { walkComponentFiles } from '../paths.mjs';
+import { walkComponentFiles, isPathUnderDir } from '../paths.mjs';
 
 const SUPPORTED_FRAMEWORKS = new Set(['react', 'vue']);
 
@@ -61,12 +61,9 @@ function detectFramework({ projectRoot, uiDir, requestedFramework }) {
 }
 
 function frameworkFromCodeCache(cache, sourceRoot) {
-  const sourcePrefix = sourceRoot.endsWith(path.sep)
-    ? sourceRoot
-    : `${sourceRoot}${path.sep}`;
   const frameworks = new Set(
     Object.entries(cache)
-      .filter(([filePath]) => filePath.startsWith(sourcePrefix))
+      .filter(([filePath]) => isPathUnderDir(filePath, sourceRoot))
       .map(([, entry]) => entry.framework)
       .filter(Boolean),
   );

@@ -47,7 +47,7 @@ async function definitionsForMergedGroups(groups, raw, fileKey, options = {}) {
     const rawComponent = findRawComponent(raw, group.figmaNodeId, group.name);
     if (rawComponent) {
       resolved.set(group.figmaNodeId, {
-        name: group.name,
+        name: rawComponent.name,
         figmaNodeId: group.figmaNodeId,
         propertyDefinitions: rawComponent.propertyDefinitions ?? {},
       });

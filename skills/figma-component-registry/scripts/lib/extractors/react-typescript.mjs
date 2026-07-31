@@ -190,7 +190,7 @@ function mergeResolvedProps(components, filePath) {
     docs = docgenParser.parse(filePath);
   } catch (error) {
     console.warn(
-      `⚠️  docgen skipped ${filePath}: ${error instanceof Error ? error.message : error}`,
+      `WARN: docgen skipped ${filePath}: ${error instanceof Error ? error.message : error}`,
     );
     return;
   }

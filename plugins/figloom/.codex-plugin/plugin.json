@@ -1,0 +1,36 @@
+{
+  "name": "figloom",
+  "version": "0.1.0",
+  "description": "Figma component registry synchronization and drift detection workflows.",
+  "author": {
+    "name": "hungify",
+    "email": "nmhungify@gmail.com",
+    "url": "https://github.com/hungify"
+  },
+  "homepage": "https://github.com/hungify/skills#figloom",
+  "repository": "https://github.com/hungify/skills",
+  "license": "MIT",
+  "keywords": [
+    "figma",
+    "component-registry",
+    "design-to-code"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Figloom",
+    "shortDescription": "Keep Figma and code component registries aligned.",
+    "longDescription": "Synchronize Figma component metadata with code, validate registry entries, and detect drift after component edits.",
+    "developerName": "hungify",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/hungify/skills",
+    "defaultPrompt": [
+      "Sync this component with its Figma registry entry.",
+      "Validate the Figma component registry.",
+      "Check component edits for registry drift."
+    ]
+  }
+}

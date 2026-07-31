@@ -10,6 +10,7 @@ import {
   nowIso,
   hashContent,
   hashJson,
+  isPathUnderDir,
   walkComponentFiles,
 } from '../paths.mjs';
 import { checkCodePropsDrift } from '../domain/check-code-drift.mjs';
@@ -18,11 +19,10 @@ import { detectFramework } from '../domain/framework.mjs';
 const EXTRACTOR_VERSION = 9;
 
 function buildCodeRawFromCache(cache, uiDir) {
-  const uiDirPrefix = uiDir.endsWith(path.sep) ? uiDir : `${uiDir}${path.sep}`;
   const extractedComponents = [];
 
   for (const [filePath, entry] of Object.entries(cache)) {
-    if (!filePath.startsWith(uiDirPrefix)) continue;
+    if (!isPathUnderDir(filePath, uiDir)) continue;
     for (const [componentName, component] of Object.entries(entry.components ?? {})) {
       extractedComponents.push({
         componentName,
@@ -56,13 +56,13 @@ function buildCodeRawFromCache(cache, uiDir) {
     componentIndex[component.componentName].push(key);
   }
 
-  return { codeComponents, fullCodeComponents, componentIndex, uiDirPrefix };
+  return { codeComponents, fullCodeComponents, componentIndex };
 }
 
 async function cmdExtractCode(args) {
   const uiDir = args['ui-dir'] || DEFAULT_UI_DIR;
   if (!fs.existsSync(uiDir)) {
-    console.error(`❌ Missing dir ${uiDir}`);
+    console.error(`ERROR: Missing dir ${uiDir}`);
     process.exit(1);
   }
 
@@ -77,18 +77,26 @@ async function cmdExtractCode(args) {
   });
   const extractor = await loadExtractor(framework);
   const componentFiles = walkComponentFiles(uiDir, extractor.fileExtensions);
-  const uiDirPrefix = uiDir.endsWith(path.sep) ? uiDir : `${uiDir}${path.sep}`;
 
   let reused = 0;
   let reparsed = 0;
 
+  let extractionErrors = [];
   const cache = await withCodeCacheLock(codeCachePath, async (lockedCache) => {
     const next = { ...lockedCache };
     const seenFiles = new Set();
+    extractionErrors = [];
 
     for (const filePath of componentFiles) {
       seenFiles.add(filePath);
-      const source = fs.readFileSync(filePath, 'utf8');
+      let source;
+      try {
+        source = fs.readFileSync(filePath, 'utf8');
+      } catch (error) {
+        extractionErrors.push(`${filePath}: ${error instanceof Error ? error.message : error}`);
+        delete next[filePath];
+        continue;
+      }
       const hash = hashContent(source);
       const cached = next[filePath];
 
@@ -103,23 +111,34 @@ async function cmdExtractCode(args) {
         continue;
       }
 
-      reparsed++;
-      next[filePath] = {
-        hash,
-        framework,
-        extractorVersion: EXTRACTOR_VERSION,
-        extractedAt: nowIso(),
-        components: extractor.extractComponents(filePath),
-      };
+      try {
+        const components = extractor.extractComponents(filePath);
+        reparsed++;
+        next[filePath] = {
+          hash,
+          framework,
+          extractorVersion: EXTRACTOR_VERSION,
+          extractedAt: nowIso(),
+          components,
+        };
+      } catch (error) {
+        extractionErrors.push(`${filePath}: ${error instanceof Error ? error.message : error}`);
+        delete next[filePath];
+      }
     }
 
     for (const knownPath of Object.keys(next)) {
-      if (!knownPath.startsWith(uiDirPrefix)) continue;
+      if (!isPathUnderDir(knownPath, uiDir)) continue;
       if (!seenFiles.has(knownPath)) delete next[knownPath];
     }
 
     return next;
   });
+
+  if (extractionErrors.length > 0) {
+    console.warn(`WARN: ${extractionErrors.length} file(s) failed extraction and were skipped:`);
+    extractionErrors.forEach((message) => console.warn(`   - ${message}`));
+  }
 
   const { codeComponents, fullCodeComponents } = buildCodeRawFromCache(cache, uiDir);
 
@@ -128,7 +147,7 @@ async function cmdExtractCode(args) {
 
   if (!quiet) {
     console.log(
-      `✅ Extract ${Object.keys(codeComponents).length} comps / ${componentFiles.length} source files (cache ${reused}, parse ${reparsed}) → ${codeCachePath}`,
+      `OK: Extract ${Object.keys(codeComponents).length} comps / ${componentFiles.length} source files (cache ${reused}, parse ${reparsed}) → ${codeCachePath}`,
     );
   }
 
@@ -163,12 +182,22 @@ async function cmdExtractCode(args) {
       registryRoot,
       sourceRoot,
     });
-    if (stale.length > 0) {
+    if (stale.length > 0 || extractionErrors.length > 0) {
       if (quiet) {
-        console.error(`❌ ${stale.length} stale registry codePropsMap(s) — run without --quiet for details`);
+        console.error(
+          `ERROR: ${stale.length} stale registry codePropsMap(s), ${extractionErrors.length} extraction error(s) — run without --quiet for details`,
+        );
       } else {
-        console.error(`❌ ${stale.length} stale registry codePropsMap(s):`);
-        stale.forEach((message) => console.error(`   - ${message}`));
+        if (stale.length > 0) {
+          console.error(`ERROR: ${stale.length} stale registry codePropsMap(s):`);
+          stale.forEach((message) => console.error(`   - ${message}`));
+        }
+        if (extractionErrors.length > 0) {
+          console.error(
+            `ERROR: ${extractionErrors.length} file(s) failed extraction (registry cannot be verified against current source):`,
+          );
+          extractionErrors.forEach((message) => console.error(`   - ${message}`));
+        }
       }
       process.exit(1);
     }

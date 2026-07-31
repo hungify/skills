@@ -108,26 +108,30 @@ function validateAssignedValue(problems, context, codeProp, value) {
   }
 }
 
-function validateMapping(problems, context, mapping, rawProp, codeComponent) {
+function validateMappingFields(context, mapping) {
+  const problems = [];
   for (const key of Object.keys(mapping)) {
     if (!ALLOWED_MAPPING_FIELDS.has(key)) problems.push(`${context}: unknown field "${key}"`);
   }
   for (const field of ['figmaProp', 'figmaType', 'mappingKind']) {
     if (!(field in mapping)) problems.push(`${context}: missing "${field}"`);
   }
-  if (!VALID_MAPPING_KIND.has(mapping.mappingKind)) {
-    problems.push(`${context}: bad mappingKind "${mapping.mappingKind}"`);
-    return;
+  return problems;
+}
+
+function validateMappingAgainstRawProp(context, mapping, rawProp) {
+  if (mapping.mappingKind === 'static') return [];
+  if (!rawProp) return [`${context}: missing Figma property in fetched raw data`];
+  if (mapping.figmaType !== rawProp.type) {
+    return [
+      `${context}: figmaType "${mapping.figmaType}" does not match Figma "${rawProp.type}"`,
+    ];
   }
-  if (mapping.mappingKind !== 'static') {
-    if (!rawProp) {
-      problems.push(`${context}: missing Figma property in fetched raw data`);
-    } else if (mapping.figmaType !== rawProp.type) {
-      problems.push(
-        `${context}: figmaType "${mapping.figmaType}" does not match Figma "${rawProp.type}"`,
-      );
-    }
-  }
+  return [];
+}
+
+function validateMappingKindShape(context, mapping) {
+  const problems = [];
   if (mapping.mappingKind === 'direct' && !mapping.prop) {
     problems.push(`${context}: direct needs prop`);
   }
@@ -152,45 +156,53 @@ function validateMapping(problems, context, mapping, rawProp, codeComponent) {
   ) {
     problems.push(`${context}: ${mapping.mappingKind} must not set values`);
   }
-  if (mapping.mappingKind === 'composition' || mapping.mappingKind === 'unsupported') {
-    const exactCandidates = exactCodePropCandidates(mapping.figmaProp, codeComponent);
-    if (exactCandidates.length > 0) {
-      problems.push(
-        `${context}: ${mapping.mappingKind} rejected because exact code prop candidate exists [${exactCandidates.join(', ')}]; use direct/bundle or rename the Figma property`,
-      );
-    }
-  }
-  validateValueCoverage(problems, context, mapping, rawProp);
-  if (mapping.mappingKind === 'direct' && valueMapIsRedundant(mapping.valueMap)) {
-    problems.push(`${context}: redundant valueMap; Figma and code values already match`);
-  }
+  return problems;
+}
 
-  if (mapping.mappingKind === 'direct' && !mapping.valueMap && rawProp) {
-    const figmaValues = figmaValuesForRawProp(rawProp);
-    const codeProp = codeComponent?.props?.[mapping.prop];
-    const codeValues = codeProp?.values?.map(String) ?? [];
-    if (figmaValues.length > 0) {
-      const implicitBooleanMapping = rawProp.type === 'BOOLEAN' && codeProp?.type === 'boolean';
-      if (!implicitBooleanMapping && codeValues.length === 0) {
-        problems.push(
-          `${context}: direct enumerable mapping cannot prove code values; full valueMap required (Figma [${figmaValues.join(', ')}])`,
-        );
-      } else if (
-        !implicitBooleanMapping &&
-        (figmaValues.length !== codeValues.length ||
-          figmaValues.some((value) => !codeValues.some((candidate) => sameValue(candidate, value))))
-      ) {
-        problems.push(
-          `${context}: direct Figma/code values differ; full valueMap required (Figma [${figmaValues.join(', ')}], code [${codeValues.join(', ')}])`,
-        );
-      }
-    }
-  }
+function validateExactCodePropRejection(context, mapping, codeComponent) {
+  if (mapping.mappingKind !== 'composition' && mapping.mappingKind !== 'unsupported') return [];
+  const exactCandidates = exactCodePropCandidates(mapping.figmaProp, codeComponent);
+  if (exactCandidates.length === 0) return [];
+  return [
+    `${context}: ${mapping.mappingKind} rejected because exact code prop candidate exists [${exactCandidates.join(', ')}]; use direct/bundle or rename the Figma property`,
+  ];
+}
 
+function validateDirectValueProof(context, mapping, rawProp, codeComponent) {
+  if (mapping.mappingKind !== 'direct' || mapping.valueMap || !rawProp) return [];
+  const figmaValues = figmaValuesForRawProp(rawProp);
+  if (figmaValues.length === 0) return [];
+  const codeProp = codeComponent?.props?.[mapping.prop];
+  const codeValues = codeProp?.values?.map(String) ?? [];
+  const implicitBooleanMapping = rawProp.type === 'BOOLEAN' && codeProp?.type === 'boolean';
+  if (implicitBooleanMapping) return [];
+  if (codeValues.length === 0) {
+    return [
+      `${context}: direct enumerable mapping cannot prove code values; full valueMap required (Figma [${figmaValues.join(', ')}])`,
+    ];
+  }
+  if (
+    figmaValues.length !== codeValues.length ||
+    figmaValues.some((value) => !codeValues.some((candidate) => sameValue(candidate, value)))
+  ) {
+    return [
+      `${context}: direct Figma/code values differ; full valueMap required (Figma [${figmaValues.join(', ')}], code [${codeValues.join(', ')}])`,
+    ];
+  }
+  return [];
+}
+
+function validateMappingCodePropsExist(context, mapping, codeComponent) {
+  const problems = [];
   for (const prop of mappingCodeProps(mapping)) {
     const codeProp = codeComponent?.props?.[prop];
     if (!codeProp) problems.push(`${context}: prop "${prop}" missing from code API`);
   }
+  return problems;
+}
+
+function validateAssignedValues(context, mapping, codeComponent) {
+  const problems = [];
   if (mapping.mappingKind === 'direct' && mapping.valueMap) {
     const codeProp = codeComponent?.props?.[mapping.prop];
     for (const [figmaValue, value] of Object.entries(mapping.valueMap)) {
@@ -209,6 +221,25 @@ function validateMapping(problems, context, mapping, rawProp, codeComponent) {
       }
     }
   }
+  return problems;
+}
+
+function validateMapping(problems, context, mapping, rawProp, codeComponent) {
+  problems.push(...validateMappingFields(context, mapping));
+  if (!VALID_MAPPING_KIND.has(mapping.mappingKind)) {
+    problems.push(`${context}: bad mappingKind "${mapping.mappingKind}"`);
+    return;
+  }
+  problems.push(...validateMappingAgainstRawProp(context, mapping, rawProp));
+  problems.push(...validateMappingKindShape(context, mapping));
+  problems.push(...validateExactCodePropRejection(context, mapping, codeComponent));
+  validateValueCoverage(problems, context, mapping, rawProp);
+  if (mapping.mappingKind === 'direct' && valueMapIsRedundant(mapping.valueMap)) {
+    problems.push(`${context}: redundant valueMap; Figma and code values already match`);
+  }
+  problems.push(...validateDirectValueProof(context, mapping, rawProp, codeComponent));
+  problems.push(...validateMappingCodePropsExist(context, mapping, codeComponent));
+  problems.push(...validateAssignedValues(context, mapping, codeComponent));
 }
 
 function validateMatchedSemantic(matched, raw, codeRaw) {
