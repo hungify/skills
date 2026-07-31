@@ -665,6 +665,43 @@ async function testExtractVue3Command() {
   console.log('extract Vue 3 command → PASS');
 }
 
+async function testExtractCodeSkipsBrokenFileContinuesOthers() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fcr-vue-broken-'));
+  const uiDir = path.join(dir, 'ui');
+  fs.mkdirSync(uiDir, { recursive: true });
+  fs.copyFileSync(
+    path.join(__dirname, 'fixtures/vue3/Broken.vue'),
+    path.join(uiDir, 'Broken.vue'),
+  );
+  fs.writeFileSync(
+    path.join(uiDir, 'Good.vue'),
+    '<script setup lang="ts">defineProps<{ size: string }>()</script><template><div /></template>',
+  );
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ dependencies: { vue: '^3.5.0' } }));
+  const cachePath = path.join(dir, '.figma', 'cache', 'code-props-cache.json');
+
+  const logs = [];
+  const origWarn = console.warn;
+  const origLog = console.log;
+  console.warn = (...items) => logs.push(items.join(' '));
+  console.log = (...items) => logs.push(items.join(' '));
+  try {
+    await cmdExtractCode({ 'ui-dir': uiDir, 'project-root': dir, 'code-cache': cachePath });
+  } finally {
+    console.warn = origWarn;
+    console.log = origLog;
+  }
+
+  const cache = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+  assert.ok(cache[path.join(uiDir, 'Good.vue')], 'Good.vue should still be extracted');
+  assert.ok(!cache[path.join(uiDir, 'Broken.vue')], 'Broken.vue should not be cached');
+  assert.ok(
+    logs.some((line) => line.includes('Broken.vue')),
+    `expected a warning naming Broken.vue; logs:\n${logs.join('\n')}`,
+  );
+  console.log('extract-code skips broken file, continues others → PASS');
+}
+
 function loadSemanticFixture(name) {
   const dir = path.join(__dirname, 'fixtures', name);
   return {
@@ -1263,6 +1300,7 @@ const tests = [
   testReactExtractorExcludesOnlyConfirmedNoise,
   testExtractVue3Sfc,
   testExtractVue3Command,
+  testExtractCodeSkipsBrokenFileContinuesOthers,
   testSemanticGoodMatched,
   testSemanticUnknownProp,
   testSemanticValueCoverage,

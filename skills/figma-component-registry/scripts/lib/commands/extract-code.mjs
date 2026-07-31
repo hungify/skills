@@ -81,9 +81,11 @@ async function cmdExtractCode(args) {
   let reused = 0;
   let reparsed = 0;
 
+  let extractionErrors = [];
   const cache = await withCodeCacheLock(codeCachePath, async (lockedCache) => {
     const next = { ...lockedCache };
     const seenFiles = new Set();
+    extractionErrors = [];
 
     for (const filePath of componentFiles) {
       seenFiles.add(filePath);
@@ -102,14 +104,19 @@ async function cmdExtractCode(args) {
         continue;
       }
 
-      reparsed++;
-      next[filePath] = {
-        hash,
-        framework,
-        extractorVersion: EXTRACTOR_VERSION,
-        extractedAt: nowIso(),
-        components: extractor.extractComponents(filePath),
-      };
+      try {
+        const components = extractor.extractComponents(filePath);
+        reparsed++;
+        next[filePath] = {
+          hash,
+          framework,
+          extractorVersion: EXTRACTOR_VERSION,
+          extractedAt: nowIso(),
+          components,
+        };
+      } catch (error) {
+        extractionErrors.push(`${filePath}: ${error instanceof Error ? error.message : error}`);
+      }
     }
 
     for (const knownPath of Object.keys(next)) {
@@ -119,6 +126,11 @@ async function cmdExtractCode(args) {
 
     return next;
   });
+
+  if (extractionErrors.length > 0) {
+    console.warn(`⚠️  ${extractionErrors.length} file(s) failed extraction and were skipped:`);
+    extractionErrors.forEach((message) => console.warn(`   - ${message}`));
+  }
 
   const { codeComponents, fullCodeComponents } = buildCodeRawFromCache(cache, uiDir);
 
