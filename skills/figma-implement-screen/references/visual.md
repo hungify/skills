@@ -10,11 +10,11 @@ Prefer the `figma-fidelity` MCP:
 
 | Tool                  | Use                                                     |
 | --------------------- | ------------------------------------------------------- |
-| `fidelity_fetch_gold` | Fetch exact Figma node reference                        |
-| `fidelity_run`        | Capture app, compare, write score and diff              |
-| `fidelity_done_gate`  | Validate that declared evidence is complete and current |
+| `fidelity_verify`    | Fetch fresh gold, capture stable final UI, compare, and write evidence for 1–8 contracts |
+| `fidelity_done_gate` | Validate declared score, gold, hashes, scope, freshness, and stability                  |
+| `fidelity_status`    | Confirm token, server version, and project-root resolution                              |
 
-CLI fallback through configured package manager's exec command for `figma-fidelity` is allowed when MCP is unavailable.
+Low-level fetch/run/capture/compare tools are debug-only. CLI fallback through configured package manager's exec command for `figma-fidelity` is allowed when MCP is unavailable.
 
 Use absolute artifact paths. Never claim a visual result from a stale capture.
 
@@ -63,7 +63,7 @@ Run at most three focused fix rounds per supplied node:
    - `page` for whole-page comparison;
    - `component/strict` plus selector and expected size for a region.
 5. Read `matchRatio`, `diff.png`, and `topIssues`.
-6. Fix high-value mismatches, rerun, and validate evidence integrity with `fidelity_done_gate`.
+6. Fix high-value mismatches, rerun affected contracts through `fidelity_verify`, and validate evidence integrity with `fidelity_done_gate`.
 
 Do not stop because page average looks high. `pass=false` or a blocking residual cluster means the declared contract is not done. For page dilution/localized failure, inspect a focused descendant region in addition to the page, then fix the underlying page layout. If evidence cannot be generated or remains blocked after three rounds, report the blocker and exact diff paths. Do not manufacture a PASS or claim implementation complete.
 

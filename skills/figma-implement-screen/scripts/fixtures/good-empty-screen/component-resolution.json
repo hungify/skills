@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "name": "good-empty-screen",
   "target": { "kind": "screen", "route": "/plain" },
   "source": { "fileKey": "x", "nodes": [{ "id": "desktop", "nodeId": "1:2" }] },

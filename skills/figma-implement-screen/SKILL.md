@@ -15,7 +15,7 @@ This skill does not autonomously approve UI. Developer always reviews generated 
 
 | Need                        | Read                                      |
 | --------------------------- | ----------------------------------------- |
-| Contract and prop-map rules | [screen contract](references/contract.md) |
+| Artifact and registry rules | [screen contract](references/contract.md) |
 | File placement              | [structure](references/structure.md)      |
 | Test selectors              | [automation](references/automation.md)    |
 | UI accessibility            | [validation](references/validation.md)    |
@@ -49,7 +49,8 @@ Read `.figma/screen.config.json` when present:
 	"framework": "react",
 	"packageManager": "pnpm",
 	"pathAliases": { "#/": "src/" },
-	"screensGlob": "src/features/*/screens/*/"
+	"screensGlob": "src/features/*/screens/*/",
+	"componentRegistryCli": ".agents/skills/figma-component-registry/scripts/figma-component-registry.mjs"
 }
 ```
 
@@ -86,10 +87,12 @@ Fetch `get_design_context` and `get_screenshot` for every requested node. For la
 
 1. Generate raw inventory with project `figma-inventory` script.
 2. Classify each reusable item as detected or ignored.
-3. Resolve through `src/components/ui`, validated prop maps, and `.figma/layout-map.json`.
+3. Resolve through `src/components/ui`, validated `registry/**/*.json`, and `.figma/layout-map.json`.
 4. Known design-system primitives cannot be ignored.
 5. Icons/decorative assets require explicit replacement evidence in screen artifact.
-6. Missing/stale prop map → run `figma-props-sync`; never guess props.
+6. Missing/stale registry entry → use `figma-component-registry`; never guess props or edit generated registry JSON by hand.
+
+For every design-system resolution, record exact `registryEntry.filePath` and canonical SHA-256 `contentHash`. Gate cross-checks export name, source import path, and hash, then runs scoped registry `check` plus `verify-source` through configured CLI.
 
 Ignored non-primitive items need exact identity, classification, replacement where relevant, and concise reason in task artifact. Separate pre-committed waiver files are not required for developer-reviewed UI work.
 
@@ -123,11 +126,10 @@ Before gate, inventory every locally declared adapter-recognized root in scanned
 
 For every requested mobile/desktop/state node:
 
-1. fetch current gold;
-2. capture actual UI;
-3. run fidelity comparison;
-4. inspect `diff.png`;
-5. rerun after fixes, maximum three rounds.
+1. Call `fidelity_verify` once with 1–8 exact contracts. It fetches fresh gold, captures stable final UI, compares, and writes evidence.
+2. Inspect every returned `diff.png` and `topIssues`; `allPassed=true` is necessary but does not replace inspection.
+3. Fix mismatches and rerun affected contracts only, maximum three rounds.
+4. Call `fidelity_done_gate` with exact screen contracts before local unified gate.
 
 Use a primary-content crop when it gives useful review evidence; add page comparison when chrome matters. A region can be a form/content group even when no card or surface exists. Geometry may suggest crops but does not replace developer judgment.
 
@@ -140,7 +142,7 @@ Every declared visual contract must have complete, fresh, hash-bound evidence an
   --artifact .figma/artifacts/screens/<feature>/<screen>/screen-implementation.json
 ```
 
-Then run skill validation, lint/typecheck where available, and existing tests. Automated tests are regression support, not proof of missing business logic.
+Then run skill validation, configured behavior/accessibility tests, lint/typecheck, and existing tests. Story/render tests or component tests prove supplied UI states; visual evidence alone does not prove interaction or accessibility.
 
 Final report:
 
@@ -158,6 +160,6 @@ Manual QA: required
 ## Boundaries
 
 - Design-system component → `figma-implement-component`.
-- Prop-map-only → `figma-props-sync`.
+- Registry-only → `figma-component-registry`.
 - Figma canvas writes → Figma authoring tools.
 - Developer owns final approval and manual UI test.

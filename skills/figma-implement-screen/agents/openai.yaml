@@ -1,15 +1,15 @@
 interface:
   display_name: "Figma Implement Screen"
-  short_description: "Implement reviewable Figma web screen UI"
-  default_prompt: "Use $figma-implement-screen to implement this Figma web screen through the configured framework adapter with reviewable fidelity evidence."
+  short_description: "Implement Figma web screens with gated evidence"
+  default_prompt: "Use $figma-implement-screen to build this Figma web screen with registry reuse, preserved behavior, and verified visual evidence."
 
 dependencies:
   tools:
     - type: "mcp"
       value: "figma"
-      description: "Figma MCP server"
+      description: "Figma design context, screenshots, metadata, and assets"
       transport: "streamable_http"
       url: "https://mcp.figma.com/mcp"
     - type: "mcp"
       value: "figma-fidelity"
-      description: "Local Figma gold-to-app fidelity gate"
+      description: "Fresh gold, stable capture, visual comparison, and done-gate evidence"

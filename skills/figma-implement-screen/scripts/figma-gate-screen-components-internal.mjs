@@ -14,7 +14,6 @@ import {
   matchesScreensGlob,
   normalizeImportPath,
 } from "./screen-config.mjs";
-const PROP_MAP_DIR = ".figma/prop-map";
 const LAYOUT_MAP_FILE = ".figma/layout-map.json";
 const SOURCE_NODE_ID = /^\d+:\d+$/;
 const FIGMA_NODE_ID = /^(?:I\d+:\d+(?:;\d+:\d+)+|\d+:\d+)$/;
@@ -114,6 +113,14 @@ const designSystemResolutionSchema = z
     codeComponent: z.string().min(1),
     importPath: z.string().min(1),
     decision: z.literal("reuse"),
+    registryEntry: z
+      .object({
+        filePath: z
+          .string()
+          .regex(/^registry\/(?:[^/]+\/)+[^/]+\.json$/, "expected registry/<area>/<ExportName>.json"),
+        contentHash: z.string().regex(/^sha256:[a-f0-9]{64}$/),
+      })
+      .strict(),
   })
   .strict();
 const layoutResolutionSchema = z
@@ -169,7 +176,7 @@ const pageVisualContractSchema = z
   .strict();
 const componentResolutionArtifactSchema = z
   .object({
-    schemaVersion: z.literal(5),
+    schemaVersion: z.literal(6),
     name: z.string().min(1),
     target: z.object({ kind: z.literal("screen"), route: z.string().startsWith("/") }).strict(),
     source: z
@@ -280,32 +287,6 @@ const layoutMapSchema = z
     ),
   })
   .strict();
-function mappingSignature(mapping) {
-  return canonicalize({
-    figmaType: mapping.figmaType,
-    mappingKind: mapping.mappingKind,
-    reactProp: mapping.reactProp ?? null,
-    valueMap: mapping.valueMap ?? null,
-    valueOverrides: mapping.valueOverrides ?? null,
-  });
-}
-function propMapGroupConflicts(mapFile) {
-  const byName = /* @__PURE__ */ new Map();
-  const conflicts = [];
-  for (const group of mapFile.groups) {
-    for (const mapping of group.mappings) {
-      const name = stripFigmaPropId(mapping.figmaProp);
-      const signature = mappingSignature(mapping);
-      const previous = byName.get(name);
-      if (previous && previous.signature !== signature) {
-        conflicts.push(`${name} (${previous.groupNodeId}, ${group.figmaNodeId})`);
-      } else if (!previous) {
-        byName.set(name, { groupNodeId: group.figmaNodeId, signature });
-      }
-    }
-  }
-  return [...new Set(conflicts)].sort();
-}
 function layoutMapDuplicateIdentities(layoutMap) {
   const seen = /* @__PURE__ */ new Set();
   const duplicates = /* @__PURE__ */ new Set();
@@ -383,130 +364,89 @@ function usesResolution(analysis, resolution, config) {
   }
   return false;
 }
-function propMapPath(repoComponent) {
-  return path.join(PROP_MAP_DIR, `${repoComponent}.json`);
-}
 function stripFigmaPropId(name) {
   return name.replace(/#\d+:\d+$/, "").trim();
 }
-function codeValuesFromEntry(entry) {
-  const values = /* @__PURE__ */ new Set();
-  if (entry.valueMap) {
-    for (const mapped of Object.values(entry.valueMap)) {
-      if (mapped === null || mapped === void 0) continue;
-      values.add(String(mapped));
+function codePropsForBinding(binding) {
+  if (binding.mappingKind === "direct") return [binding.prop];
+  if (binding.mappingKind === "bundle") return binding.props;
+  return [];
+}
+function indexRegistryEntry(registryEntry) {
+  const figmaNames = /* @__PURE__ */ new Map();
+  const mappedCodeProps = /* @__PURE__ */ new Set();
+  const bindingsByCodeProp = /* @__PURE__ */ new Map();
+  for (const binding of registryEntry.figmaBindings) {
+    const codeProps = codePropsForBinding(binding);
+    const indexed = { binding, codeProps };
+    figmaNames.set(stripFigmaPropId(binding.propName), indexed);
+    figmaNames.set(binding.propName, indexed);
+    for (const prop of codeProps) {
+      mappedCodeProps.add(prop);
+      const current = bindingsByCodeProp.get(prop) ?? [];
+      current.push(binding);
+      bindingsByCodeProp.set(prop, current);
     }
   }
-  if (entry.valueOverrides) {
-    for (const override of Object.values(entry.valueOverrides)) {
-      for (const mapped of Object.values(override)) {
-        if (mapped === null || mapped === void 0) continue;
-        values.add(String(mapped));
+  return { figmaNames, mappedCodeProps, bindingsByCodeProp };
+}
+function figmaValueKeysForCodeProp(bindings) {
+  const keys = /* @__PURE__ */ new Set();
+  for (const binding of bindings) {
+    for (const key of Object.keys(binding.valueMap ?? binding.valueProps ?? {})) keys.add(key);
+  }
+  return keys;
+}
+function codeValuesForCodeProp(bindings, prop) {
+  const values = /* @__PURE__ */ new Set();
+  for (const binding of bindings) {
+    if (binding.mappingKind === "direct") {
+      for (const value of Object.values(binding.valueMap ?? {})) {
+        if (value !== null && value !== void 0) values.add(String(value));
+      }
+    }
+    if (binding.mappingKind === "bundle") {
+      for (const assignment of Object.values(binding.valueProps ?? {})) {
+        const value = assignment?.[prop];
+        if (value !== null && value !== void 0) values.add(String(value));
       }
     }
   }
   return values;
 }
-function figmaKeysFromEntry(entry) {
-  const keys = /* @__PURE__ */ new Set();
-  if (entry.mappingKind === "direct" && entry.figmaType === "BOOLEAN" && !entry.valueMap) {
-    keys.add("False");
-    keys.add("True");
-  }
-  if (entry.valueMap) {
-    for (const key of Object.keys(entry.valueMap)) keys.add(key);
-  }
-  if (entry.valueOverrides) {
-    for (const key of Object.keys(entry.valueOverrides)) keys.add(key);
-  }
-  return keys;
-}
-function indexPropMap(mapFile) {
-  const figmaNames = /* @__PURE__ */ new Map();
-  const mappedReactProps = /* @__PURE__ */ new Set();
-  for (const entry of mapFile.groups.flatMap((group) => group.mappings)) {
-    const rawName = entry.figmaProp;
-    const figmaName = stripFigmaPropId(rawName);
-    const kind = entry.mappingKind;
-    let reactProp = null;
-    if (kind === "direct") {
-      reactProp = entry.reactProp ?? null;
-    } else if (kind === "override" && entry.valueOverrides) {
-      for (const override of Object.values(entry.valueOverrides)) {
-        for (const propName of Object.keys(override)) mappedReactProps.add(propName);
-      }
-    }
-    if (reactProp) mappedReactProps.add(reactProp);
-    const indexed = { reactProp, codeValues: codeValuesFromEntry(entry) };
-    figmaNames.set(figmaName, indexed);
-    figmaNames.set(rawName, indexed);
-  }
-  return { figmaNames, mappedReactProps };
-}
-function figmaValueKeysForReactProp(mapFile, reactProp) {
-  const keys = /* @__PURE__ */ new Set();
-  for (const entry of mapFile.groups.flatMap((group) => group.mappings)) {
-    const kind = entry.mappingKind;
-    if (kind === "direct" && entry.reactProp === reactProp) {
-      for (const key of figmaKeysFromEntry(entry)) keys.add(key);
-    }
-    if (kind === "override" && entry.valueOverrides) {
-      for (const [figmaValue, override] of Object.entries(entry.valueOverrides)) {
-        if (reactProp in override) keys.add(figmaValue);
-      }
-    }
-  }
-  return keys;
-}
-function readPropMapV2(mapPath, repoComponent, reasons) {
-  let mapFile;
+function readRegistryEntry(resolution, reasons) {
+  const registryPath = resolution.registryEntry.filePath;
+  let registryEntry;
   try {
-    mapFile = JSON.parse(fs.readFileSync(mapPath, "utf-8"));
+    registryEntry = JSON.parse(fs.readFileSync(registryPath, "utf-8"));
   } catch {
-    reasons.push(`prop-map unreadable JSON for ${repoComponent} (${mapPath})`);
+    reasons.push(`registry entry unreadable JSON for ${resolution.codeComponent} (${registryPath})`);
     return null;
   }
-  if (mapFile.schemaVersion !== 2) {
-    reasons.push(`unsupported prop-map schemaVersion for ${repoComponent} (${mapPath})`);
+  if (
+    registryEntry.schemaVersion !== 3 ||
+    registryEntry.component?.exportName !== resolution.codeComponent ||
+    typeof registryEntry.component?.filePath !== "string" ||
+    !registryEntry.codePropsMap ||
+    !Array.isArray(registryEntry.figmaBindings)
+  ) {
+    reasons.push(`registry entry schema/identity invalid for ${resolution.codeComponent} (${registryPath})`);
     return null;
   }
-  if (mapFile.target?.component !== repoComponent || !Array.isArray(mapFile.groups)) {
-    reasons.push(`prop-map target/groups invalid for ${repoComponent} (${mapPath})`);
-    return null;
-  }
-  const validKinds = /* @__PURE__ */ new Set(["direct", "override", "composition", "unmapped"]);
-  const validGroups =
-    mapFile.groups.length > 0 &&
-    mapFile.groups.every(
-      (group) =>
-        Boolean(group.figmaNodeId && group.name) &&
-        Array.isArray(group.mappings) &&
-        group.mappings.length > 0 &&
-        group.mappings.every(
-          (mapping) =>
-            Boolean(mapping.figmaProp && mapping.figmaType) && validKinds.has(mapping.mappingKind),
-        ),
-    );
-  if (!validGroups) {
-    reasons.push(`prop-map groups/mappings invalid for ${repoComponent} (${mapPath})`);
-    return null;
-  }
-  const conflicts = propMapGroupConflicts(mapFile);
-  if (conflicts.length > 0) {
+  const actualHash = contentHash(registryEntry);
+  if (actualHash !== resolution.registryEntry.contentHash) {
     reasons.push(
-      `prop-map group mappings conflict after name normalization for ${repoComponent} (${mapPath}): ${conflicts.join(", ")}`,
+      `registry entry contentHash mismatch for ${resolution.codeComponent}: artifact=${resolution.registryEntry.contentHash} actual=${actualHash}`,
     );
     return null;
   }
-  return mapFile;
+  return registryEntry;
 }
-function checkPropMapUsage(file, analysis, resolution, adapter, config, reasons) {
+function checkRegistryUsage(file, analysis, resolution, adapter, config, reasons) {
   if (resolution.kind !== "design-system") return;
-  const mapPath = propMapPath(resolution.codeComponent);
-  if (!fs.existsSync(mapPath)) return;
-  const mapFile = readPropMapV2(mapPath, resolution.codeComponent, reasons);
-  if (!mapFile) return;
-  const index = indexPropMap(mapFile);
+  const registryEntry = readRegistryEntry(resolution, reasons);
+  if (!registryEntry) return;
+  const index = indexRegistryEntry(registryEntry);
   const locals = importedLocalNames(analysis, resolution, config);
   for (const usage of analysis.componentUsages) {
     if (!locals.has(usage.name)) continue;
@@ -518,18 +458,17 @@ function checkPropMapUsage(file, analysis, resolution, adapter, config, reasons)
     for (const attr of usage.attributes) {
       if (adapter.isAllowedComponentAttribute(attr.name)) continue;
       const figmaHit = index.figmaNames.get(attr.name);
-      if (figmaHit && figmaHit.reactProp && figmaHit.reactProp !== attr.name) {
+      if (figmaHit && !figmaHit.codeProps.includes(attr.name)) {
         reasons.push(
-          `figma prop name used as JSX attr in ${file}:${attr.line}; <${usage.name} ${attr.name}=...> should use mapped reactProp "${figmaHit.reactProp}" from ${mapPath}`,
+          `figma prop name used as JSX attr in ${file}:${attr.line}; <${usage.name} ${attr.name}=...> should use mapped code prop(s) "${figmaHit.codeProps.join(", ")}" from ${resolution.registryEntry.filePath}`,
         );
         continue;
       }
-      if (attr.value !== void 0 && index.mappedReactProps.has(attr.name)) {
-        const figmaValues = figmaValueKeysForReactProp(mapFile, attr.name);
+      if (attr.value !== void 0 && index.mappedCodeProps.has(attr.name)) {
+        const bindings = index.bindingsByCodeProp.get(attr.name) ?? [];
+        const figmaValues = figmaValueKeysForCodeProp(bindings);
         if (figmaValues.has(attr.value)) {
-          const codeValues = [...index.figmaNames.values()]
-            .filter((entry) => entry.reactProp === attr.name)
-            .flatMap((entry) => [...entry.codeValues]);
+          const codeValues = [...codeValuesForCodeProp(bindings, attr.name)];
           const hint =
             codeValues.length > 0
               ? ` (expected code value like ${codeValues.slice(0, 3).join("/")})`
@@ -959,19 +898,12 @@ function main() {
   }
   for (const resolution of artifact.resolved) {
     if (!isDesignSystemResolution(resolution)) continue;
-    const mapFilePath = propMapPath(resolution.codeComponent);
-    if (!fs.existsSync(mapFilePath)) {
-      reasons.push(
-        `prop-map missing for ${resolution.codeComponent} (${mapFilePath}); run figma-props-sync`,
-      );
-      continue;
-    }
-    const mapFile = readPropMapV2(mapFilePath, resolution.codeComponent, reasons);
-    if (!mapFile) continue;
-    const expected = expectedImportPath(mapFile.target.file, config);
+    const registryEntry = readRegistryEntry(resolution, reasons);
+    if (!registryEntry) continue;
+    const expected = expectedImportPath(registryEntry.component.filePath, config);
     if (normalizeImportPath(resolution.importPath, config) !== expected) {
       reasons.push(
-        `importPath mismatch for ${resolution.codeComponent}; artifact=${resolution.importPath}, prop-map target=${expected}`,
+        `importPath mismatch for ${resolution.codeComponent}; artifact=${resolution.importPath}, registry component=${expected}`,
       );
     }
   }
@@ -1043,7 +975,7 @@ function main() {
       if (usesResolution(analysis, resolution, config)) {
         seenResolvedUsage.add(resolution.codeComponent);
         if (isDesignSystemResolution(resolution)) {
-          checkPropMapUsage(file, analysis, resolution, adapter, config, reasons);
+          checkRegistryUsage(file, analysis, resolution, adapter, config, reasons);
         }
       }
       if (!isDesignSystemResolution(resolution)) continue;
@@ -1089,4 +1021,4 @@ function main() {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main();
 }
-export { layoutMapDuplicateIdentities, propMapGroupConflicts };
+export { layoutMapDuplicateIdentities };

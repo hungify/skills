@@ -1,6 +1,6 @@
 # Screen UI implementation contract
 
-`screen-implementation.json` connects generated Figma evidence, UI component resolution, files scanned by gate, and visual comparisons. It supports developer review; it does not prove business-feature completion.
+`screen-implementation.json` connects generated Figma inventory, reviewable UI resolution, exact component-registry entries, files scanned by gate, and visual evidence. It supports developer review; it does not prove business-feature completion.
 
 Source syntax is adapter-owned. `.figma/screen.config.json` selects framework, package manager, aliases, and screen glob. Missing config defaults to React/pnpm/`#/` → `src/`/`src/features/*/screens/*/`. v2 ships only React adapter; unsupported frameworks fail explicitly.
 
@@ -16,7 +16,7 @@ Source syntax is adapter-owned. `.figma/screen.config.json` selects framework, p
 
 ```json
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "name": "login",
   "target": { "kind": "screen", "route": "/login" },
   "source": {
@@ -53,7 +53,11 @@ Source syntax is adapter-owned. `.figma/screen.config.json` selects framework, p
       "figmaNodes": ["10:20"],
       "codeComponent": "TextField",
       "importPath": "#/components/ui/input",
-      "decision": "reuse"
+      "decision": "reuse",
+      "registryEntry": {
+        "filePath": "registry/ui/TextField.json",
+        "contentHash": "sha256:..."
+      }
     }
   ],
   "unresolved": [],
@@ -92,13 +96,13 @@ Source syntax is adapter-owned. `.figma/screen.config.json` selects framework, p
 - Known design-system primitives cannot be ignored.
 - Ignored nodes carry exact identity, concise reason, and icon/asset replacement where relevant.
 - Every detected component is resolved exactly once; unresolved entries fail.
-- Design-system resolutions require current validated prop maps and explicit adapter-recognized component props. React adapter rejects unresolved JSX spreads.
+- Design-system resolutions require exact schema-v3 `registry/<area>/<ExportName>.json` evidence. Canonical hash, export name, source file/import path, scoped code drift, and live Figma source must all agree. React adapter rejects unresolved JSX spreads.
 - `implementationFiles[]` lists UI files scanned for imports, usage, ownership, raw primitives, and prop translation. Developer reviews actual Git diff; list is not whole-repo change proof.
 - `entryComponents[]` and `screenCompositions[]` own local adapter-recognized roots in scanned files.
 - Every requested source has exactly one primary visual contract. Supplemental page contracts add chrome evidence.
 - Page gold equals source node. Region gold must be visible descendant.
 - Every declared visual contract must have complete, fresh, hash-bound fidelity evidence, engine `pass=true`, and no blocking residual cluster. Missing, mismatched, or quality-blocked evidence fails. Developer still reviews non-blocking residuals and crop usefulness.
-- Unknown keys, duplicate identities, raw primitive substitutions, stale prop maps, adapter analysis failures, and missing files fail.
+- Unknown keys, duplicate identities, raw primitive substitutions, stale registry evidence, adapter analysis failures, and missing files fail.
 
 ## Developer judgment
 

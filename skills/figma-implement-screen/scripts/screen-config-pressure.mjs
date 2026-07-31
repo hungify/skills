@@ -8,6 +8,7 @@ import {
 } from "./adapters/index.mjs";
 import {
   aliasBarrelSources,
+  componentRegistryCommand,
   DEFAULT_SCREEN_CONFIG,
   loadScreenConfig,
   matchesScreensGlob,
@@ -19,7 +20,6 @@ const fixtures = path.join(scriptDir, "fixtures");
 const failures = [];
 function expect(name, condition, detail) {
   if (condition) {
-    l8u;
     console.log(`\u2713 ${name}`);
   } else {
     failures.push(`${name}: ${detail}`);
@@ -116,8 +116,19 @@ expect(
   "default behavior remains React/pnpm",
   DEFAULT_SCREEN_CONFIG.framework === "react" &&
     DEFAULT_SCREEN_CONFIG.packageManager === "pnpm" &&
-    DEFAULT_SCREEN_CONFIG.pathAliases["#/"] === "src/",
+    DEFAULT_SCREEN_CONFIG.pathAliases["#/"] === "src/" &&
+    DEFAULT_SCREEN_CONFIG.componentRegistryCli.endsWith("figma-component-registry.mjs"),
   JSON.stringify(DEFAULT_SCREEN_CONFIG),
+);
+const registryCommand = componentRegistryCommand(DEFAULT_SCREEN_CONFIG, "check", [
+  "Button",
+  "TextField",
+]);
+expect(
+  "component registry command is scoped and native Node",
+  registryCommand.command === process.execPath &&
+    registryCommand.args.join(" ").includes("check --components Button,TextField"),
+  JSON.stringify(registryCommand),
 );
 expect(
   "npm script command",

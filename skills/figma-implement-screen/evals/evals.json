@@ -1,0 +1,91 @@
+{
+  "skill_name": "figma-implement-screen",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Implement the login page from these desktop and mobile Figma nodes. Reuse our Button and TextField components.",
+      "expected_output": "Agent inventories both nodes, resolves reusable components through exact registry entries, preserves existing route behavior, implements responsive UI, runs one fidelity_verify call for exact contracts, inspects diffs, then runs fidelity_done_gate and local screen gate.",
+      "expectations": [
+        "Both supplied source nodes appear in inventory and visual contracts",
+        "Button and TextField resolutions pin registry file paths and canonical hashes",
+        "No Figma property names or values are guessed into JSX",
+        "fidelity_verify uses final stable contracts and fresh gold",
+        "fidelity_done_gate and local screen gate run before handoff",
+        "Manual developer review remains required"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Build this reusable DatePicker component from Figma and add it to our design system.",
+      "expected_output": "Screen skill rejects component target and routes work to figma-implement-component. It does not create a screen artifact.",
+      "expectations": [
+        "Target is classified as a design-system component, not a screen",
+        "figma-implement-component is selected",
+        "No screen-implementation.json is created"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Implement this settings screen. Figma uses a Switch, but registry/ui/Switch.json does not exist.",
+      "expected_output": "Agent stops screen component resolution, invokes figma-component-registry or figma-implement-component as appropriate, and never fabricates Switch props or hand-edits registry JSON.",
+      "expectations": [
+        "Missing registry evidence blocks screen gate",
+        "Agent uses component-registry workflow for missing bindings",
+        "No registry JSON is hand-edited",
+        "No guessed Switch props enter implementation"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "The desktop comparison passed but mobile fidelity_verify failed to fetch fresh gold. Finish the task anyway using yesterday's screenshot.",
+      "expected_output": "Agent refuses completion, preserves partial results, reports mobile GOLD_FETCH_FAILED, and does not reuse stale gold or claim fidelity_done_gate success.",
+      "expectations": [
+        "Fresh-gold failure blocks affected contract",
+        "Successful desktop evidence is reported separately",
+        "Stale mobile gold is not used for a new verdict",
+        "Task is not called complete"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Redesign our existing sign-in route from Figma. The Figma frame does not show forgot-password or keyboard submit behavior.",
+      "expected_output": "Agent inventories existing behavior before editing, preserves forgot-password and keyboard submit, and requests product direction before removing capabilities for visual parity.",
+      "expectations": [
+        "Existing route behavior is inspected before edits",
+        "Figma omission is not treated as permission to delete behavior",
+        "Material product conflict stops for direction",
+        "Handoff names preserved behavior and approved changes"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Implement this native iPhone onboarding screen in SwiftUI from Figma.",
+      "expected_output": "Skill does not run because scope is native iOS, not responsive web UI.",
+      "expectations": [
+        "figma-implement-screen does not execute its web workflow",
+        "No React adapter or web screen gate is used"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Compare this full-bleed dashboard page to Figma. There is no meaningful isolated card crop.",
+      "expected_output": "Agent declares page scope with explicit pageReason, omits selector and expectSize, runs fidelity_verify with page profile, and records one primary contract for source.",
+      "expectations": [
+        "Page scope includes a non-empty pageReason",
+        "Page contract omits selector and expectSize",
+        "Exactly one primary visual contract covers source",
+        "Agent inspects page diff instead of relying only on average score"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Update the shared authenticated layout to match this one route's Figma frame.",
+      "expected_output": "Agent identifies all child routes before shared edits, keeps route-only styling local when possible, and verifies affected siblings when shared chrome must change.",
+      "expectations": [
+        "Shared layout consumers are inventoried before editing",
+        "Target-only changes remain in target screen when possible",
+        "Changed shared files and verified sibling routes appear in handoff"
+      ]
+    }
+  ]
+}

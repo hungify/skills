@@ -3,7 +3,7 @@
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const DEFAULT_MAX_SCORE_AGE_MS = 15 * 60 * 1e3;
 const DEFAULT_MAX_GOLD_AGE_MS = 24 * 60 * 60 * 1e3;
 const CLOCK_SKEW_MS = 6e4;
@@ -13,6 +13,7 @@ function resolveArtifactPath(input, cwd = process.cwd()) {
 }
 function checkDoneGate(options) {
   const maxAge = options.maxScoreAgeMs ?? DEFAULT_MAX_SCORE_AGE_MS;
+  const maxGoldAge = options.maxGoldAgeMs ?? DEFAULT_MAX_GOLD_AGE_MS;
   const now = options.now?.() ?? Date.now();
   const cwd = options.cwd ?? process.cwd();
   const viewports = options.viewports.map((contract) => {
@@ -41,6 +42,9 @@ function checkDoneGate(options) {
     if (score.profile !== contract.profile) reasons.push("profile does not match contract.");
     if (score.profile === "page" && !score.pageReason?.trim()) {
       reasons.push("page score missing pageReason.");
+    }
+    if (score.profile === "page" && score.pageReason !== contract.pageReason) {
+      reasons.push("pageReason does not match contract.");
     }
     if ((score.selector ?? void 0) !== contract.selector) {
       reasons.push("selector does not match contract.");
@@ -78,8 +82,8 @@ function checkDoneGate(options) {
       reasons.push("gold fetchedAt missing/unparseable.");
     } else if (goldFetchedAtMs > now + CLOCK_SKEW_MS) {
       reasons.push("gold fetchedAt is in future.");
-    } else if (now - goldFetchedAtMs > DEFAULT_MAX_GOLD_AGE_MS) {
-      reasons.push("gold older than 24h; re-run fidelity_fetch_gold.");
+    } else if (now - goldFetchedAtMs > maxGoldAge) {
+      reasons.push(`gold older than ${Math.round(maxGoldAge / 36e5)}h; re-run fidelity_verify.`);
     } else if (Number.isFinite(capturedAtMs) && goldFetchedAtMs > capturedAtMs + CLOCK_SKEW_MS) {
       reasons.push("gold fetchedAt is later than capture.");
     }
@@ -93,6 +97,7 @@ function checkDoneGate(options) {
     ]) {
       if (!fs.existsSync(path.join(outDir, name))) reasons.push(`missing ${name}.`);
     }
+    verifyRunArtifacts(outDir, contract, score, reasons);
     verifyGoldMeta(expectedGoldMeta, contract, score.gold?.fetchedAt, reasons);
     verifyEvidenceHashes(outDir, score, reasons);
     return verdict(contract.viewport, reasons);
@@ -103,6 +108,35 @@ function checkDoneGate(options) {
     viewports,
   };
 }
+function verifyRunArtifacts(outDir, contract, score, reasons) {
+  try {
+    const meta = JSON.parse(fs.readFileSync(path.join(outDir, "run-meta.json"), "utf8"));
+    if (meta.schemaVersion !== SCHEMA_VERSION) reasons.push("run-meta schemaVersion mismatch.");
+    if (meta.fileKey !== contract.fileKey || meta.nodeId !== contract.nodeId) {
+      reasons.push("run-meta fileKey/nodeId mismatch.");
+    }
+    if (meta.viewport !== contract.viewport || meta.profile !== contract.profile) {
+      reasons.push("run-meta viewport/profile mismatch.");
+    }
+    if (meta.runType !== "final") reasons.push("run-meta runType must be final.");
+    if (contract.profile === "page" && meta.pageReason !== contract.pageReason) {
+      reasons.push("run-meta pageReason mismatch.");
+    }
+    if (!meta.viewportSize || typeof meta.viewportSize !== "object") {
+      reasons.push("run-meta viewportSize missing.");
+    }
+  } catch {
+    reasons.push("run-meta.json unreadable or invalid.");
+  }
+  try {
+    const punch = JSON.parse(fs.readFileSync(path.join(outDir, "punch-list.json"), "utf8"));
+    if (punch.schemaVersion !== SCHEMA_VERSION) reasons.push("punch-list schemaVersion mismatch.");
+    if (punch.pass !== score.pass) reasons.push("punch-list pass does not match score.");
+    if (!Array.isArray(punch.items)) reasons.push("punch-list items must be an array.");
+  } catch {
+    reasons.push("punch-list.json unreadable or invalid.");
+  }
+}
 function validateContract(contract) {
   const reasons = [];
   if (!contract.fileKey || !contract.nodeId) reasons.push("fileKey/nodeId required.");
@@ -110,6 +144,7 @@ function validateContract(contract) {
     reasons.push("done gate forbids component/dev; use component/strict for final contract.");
   }
   if (contract.profile === "page") {
+    if (!contract.pageReason?.trim()) reasons.push("page contract requires pageReason.");
     if (contract.selector) reasons.push("page contract must not set selector.");
     if (contract.expectSize) reasons.push("page contract must not set expectSize.");
   } else {

@@ -6,35 +6,51 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import {
-  layoutMapDuplicateIdentities,
-  propMapGroupConflicts,
-} from "./figma-gate-screen-components-internal.mjs";
+import { layoutMapDuplicateIdentities } from "./figma-gate-screen-components-internal.mjs";
 import { loadScreenConfig, packageScriptCommand } from "./screen-config.mjs";
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
+const screenScripts = path.dirname(fileURLToPath(import.meta.url));
+const skillDir = path.dirname(screenScripts);
+const root = fs.realpathSync(
+  fs.mkdtempSync(path.join(os.tmpdir(), "figma-screen-unified-host-")),
+);
+fs.mkdirSync(path.join(root, ".agents/skills"), { recursive: true });
+fs.symlinkSync(skillDir, path.join(root, ".agents/skills/figma-implement-screen"), "dir");
+fs.cpSync(path.join(screenScripts, "fixtures/registry"), path.join(root, "registry"), {
+  recursive: true,
+});
+fs.mkdirSync(path.join(root, ".agents/skills/figma-component-registry/scripts"), {
+  recursive: true,
+});
+fs.writeFileSync(
+  path.join(root, ".agents/skills/figma-component-registry/scripts/figma-component-registry.mjs"),
+  'console.log("PASS component registry pressure stub");\n',
+);
+fs.mkdirSync(path.join(root, ".figma"), { recursive: true });
+fs.writeFileSync(
+  path.join(root, ".figma/layout-map.json"),
+  `${JSON.stringify({ schemaVersion: 1, mappings: [] }, null, 2)}\n`,
+);
+fs.writeFileSync(
+  path.join(root, "package.json"),
+  `${JSON.stringify(
+    {
+      private: true,
+      packageManager: "pnpm@11.14.0",
+      scripts: {
+        "figma-gate:screen": `node ${path.join(screenScripts, "figma-gate-screen.mjs")}`,
+      },
+    },
+    null,
+    2,
+  )}\n`,
+);
 const screenConfig = loadScreenConfig(root);
-const screenScripts = path.join(root, ".agents/skills/figma-implement-screen/scripts");
 const fixtureFile =
   ".agents/skills/figma-implement-screen/scripts/fixtures/good-button/GoodButton.tsx";
 const artifactRoot = `.figma/artifacts/screens/pressure/unified-${process.pid}`;
 const absoluteArtifactRoot = path.join(root, artifactRoot);
-const propSourceFixture = path.join(
-  root,
-  ".agents/skills/figma-implement-component/scripts/fixtures/button-definition-groups.json",
-);
-const mockDir = fs.mkdtempSync(path.join(os.tmpdir(), "figma-screen-fetch-mock-"));
-const mockFetchPath = path.join(mockDir, "mock-fetch.cjs");
-const propSourceGroups = JSON.parse(fs.readFileSync(propSourceFixture, "utf-8")).groups;
-fs.writeFileSync(
-  mockFetchPath,
-  `const groups = ${JSON.stringify(propSourceGroups)};
-global.fetch = async (url) => { const ids = new URL(url).searchParams.get('ids').split(','); const byId = new Map(groups.map((group) => [group.figmaNodeId, group])); return { ok: true, status: 200, statusText: 'OK', json: async () => ({ version: 'pressure-v1', lastModified: '2026-07-19T00:00:00Z', nodes: Object.fromEntries(ids.map((id) => { const group = byId.get(id); return [id, { document: group ? { id, name: group.name, type: 'COMPONENT_SET', componentPropertyDefinitions: group.propertyDefinitions } : { id, name: 'Source', type: 'FRAME' } }]; })) }) }; };
-`,
-);
 const testEnv = {
   ...process.env,
-  FIGMA_ACCESS_TOKEN: "pressure-token",
-  NODE_OPTIONS: `--require=${mockFetchPath}`,
 };
 function canonicalize(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalize).join(",")}]`;
@@ -114,12 +130,13 @@ function makeVisualEvidence(outDir) {
     nodeId: "1:2",
     viewport: "desktop",
     profile: "page",
+    runType: "final",
     selector: null,
     expectSize: null,
     pageReason: "Full-bleed pressure fixture.",
   };
   writeJson(path.join(absoluteOutDir, "visual-score.json"), {
-    schemaVersion: 2,
+    schemaVersion: 3,
     ...shared,
     pass: true,
     runType: "final",
@@ -139,12 +156,12 @@ function makeVisualEvidence(outDir) {
     ),
   });
   writeJson(path.join(absoluteOutDir, "run-meta.json"), {
-    schemaVersion: 2,
+    schemaVersion: 3,
     ...shared,
     viewportSize: { width: 1440, height: 1024 },
   });
   writeJson(path.join(absoluteOutDir, "punch-list.json"), {
-    schemaVersion: 2,
+    schemaVersion: 3,
     pass: true,
     items: [],
   });
@@ -152,42 +169,6 @@ function makeVisualEvidence(outDir) {
 function main() {
   fs.mkdirSync(absoluteArtifactRoot, { recursive: true });
   try {
-    const propConflicts = propMapGroupConflicts({
-      schemaVersion: 2,
-      target: { component: "Pressure", file: "src/components/ui/pressure.tsx", apiHash: "x" },
-      groups: [
-        {
-          figmaNodeId: "1:1",
-          name: "first",
-          mappings: [
-            {
-              figmaProp: "State#1:10",
-              figmaType: "VARIANT",
-              mappingKind: "direct",
-              reactProp: "state",
-            },
-          ],
-        },
-        {
-          figmaNodeId: "2:2",
-          name: "second",
-          mappings: [
-            {
-              figmaProp: "State#2:20",
-              figmaType: "VARIANT",
-              mappingKind: "direct",
-              reactProp: "variant",
-            },
-          ],
-        },
-      ],
-    });
-    if (propConflicts.length !== 1 || !propConflicts[0]?.startsWith("State ")) {
-      throw new Error(
-        `prop-map group conflict detector missed conflict: ${propConflicts.join(",")}`,
-      );
-    }
-    console.log("\u2713 conflicting group-local prop mappings \u2192 FAIL");
     const duplicateLayoutIdentities = layoutMapDuplicateIdentities({
       schemaVersion: 1,
       mappings: [
@@ -265,7 +246,7 @@ function main() {
     const visualOutDir = `${artifactRoot}/component/page`;
     makeVisualEvidence(visualOutDir);
     const artifact = {
-      schemaVersion: 5,
+      schemaVersion: 6,
       name: "pressure-unified",
       target: { kind: "screen", route: "/pressure" },
       source: { fileKey: "x", nodes: [{ id: "component", nodeId: "1:2" }] },
@@ -282,6 +263,11 @@ function main() {
           codeComponent: "Button",
           importPath: "#/components/ui/button",
           decision: "reuse",
+          registryEntry: {
+            filePath: "registry/ui/Button.json",
+            contentHash:
+              "sha256:9e771255deef595fe36c7f988dc8f9ee40fe16b2086ea64fe962d0106b0aa7b4",
+          },
         },
       ],
       unresolved: [],
@@ -444,7 +430,10 @@ function main() {
         ...component,
         kind: "layout",
       })),
-      resolved: artifact.resolved.map((resolution) => ({ ...resolution, kind: "layout" })),
+      resolved: artifact.resolved.map(({ registryEntry: _registryEntry, ...resolution }) => ({
+        ...resolution,
+        kind: "layout",
+      })),
     });
     assertCase(
       "design-system-instance-mislabeled-layout",
@@ -654,6 +643,16 @@ function main() {
       "visual contract component.page quality blocked",
     );
     writeJson(scorePath, score);
+    const runMetaPath = path.join(root, visualOutDir, "run-meta.json");
+    const runMeta = JSON.parse(fs.readFileSync(runMetaPath, "utf-8"));
+    writeJson(runMetaPath, { ...runMeta, runType: "dev" });
+    assertCase(
+      "unified-rejects-run-meta-drift",
+      runNode(path.join(screenScripts, "figma-gate-screen.mjs"), ["--artifact", artifactPath]),
+      "FAIL",
+      "run-meta runType must be final",
+    );
+    writeJson(runMetaPath, runMeta);
     writeJson(scorePath, { ...score, profile: "component/strict" });
     assertCase(
       "unified-rejects-visual-contract-drift",
@@ -663,8 +662,7 @@ function main() {
     );
     console.log("\nAll unified screen pressure cases ok");
   } finally {
-    fs.rmSync(absoluteArtifactRoot, { recursive: true, force: true });
-    fs.rmSync(mockDir, { recursive: true, force: true });
+    fs.rmSync(root, { recursive: true, force: true });
   }
 }
 main();

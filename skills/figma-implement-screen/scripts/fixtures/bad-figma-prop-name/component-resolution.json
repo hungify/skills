@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "name": "pressure-figma-prop",
   "target": {
     "kind": "screen",
@@ -31,7 +31,8 @@
       "figmaNodes": ["2:1"],
       "codeComponent": "Button",
       "importPath": "#/components/ui/button",
-      "decision": "reuse"
+      "decision": "reuse",
+      "registryEntry": { "filePath": "registry/ui/Button.json", "contentHash": "sha256:9e771255deef595fe36c7f988dc8f9ee40fe16b2086ea64fe962d0106b0aa7b4" }
     }
   ],
   "unresolved": [],

@@ -9,6 +9,10 @@ const screenConfigSchema = z
     packageManager: z.enum(["pnpm", "npm", "yarn", "bun"]).default("pnpm"),
     pathAliases: z.record(z.string().min(1), z.string().min(1)).default({ "#/": "src/" }),
     screensGlob: z.string().min(1).default("src/features/*/screens/*/"),
+    componentRegistryCli: z
+      .string()
+      .min(1)
+      .default(".agents/skills/figma-component-registry/scripts/figma-component-registry.mjs"),
   })
   .strict();
 const DEFAULT_SCREEN_CONFIG = {
@@ -16,6 +20,8 @@ const DEFAULT_SCREEN_CONFIG = {
   packageManager: "pnpm",
   pathAliases: { "#/": "src/" },
   screensGlob: "src/features/*/screens/*/",
+  componentRegistryCli:
+    ".agents/skills/figma-component-registry/scripts/figma-component-registry.mjs",
 };
 function normalizeSlashes(value) {
   return value.replace(/\\/g, "/").replace(/^\.\//, "");
@@ -102,10 +108,19 @@ function packageScriptCommand(packageManager, script, args = []) {
       return { command: "pnpm", args: [script, ...(args.length > 0 ? ["--", ...args] : [])] };
   }
 }
+function componentRegistryCommand(config, action, components) {
+  if (!new Set(["check", "verify-source"]).has(action)) {
+    throw new Error(`unsupported component registry action: ${action}`);
+  }
+  const args = [config.componentRegistryCli, action];
+  if (components.length > 0) args.push("--components", components.join(","));
+  return { command: process.execPath, args };
+}
 export {
   DEFAULT_SCREEN_CONFIG,
   SCREEN_CONFIG_PATH,
   aliasBarrelSources,
+  componentRegistryCommand,
   loadScreenConfig,
   matchesScreensGlob,
   normalizeImportPath,

@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 3,
+  "component": {
+    "exportName": "Button",
+    "exportType": "named",
+    "filePath": "src/components/ui/button.tsx"
+  },
+  "figma": {
+    "componentPath": "Button",
+    "lastKnownFileKey": "pressure-file",
+    "lastKnownNodeId": "3:1"
+  },
+  "codePropsMap": {
+    "size": { "type": "enum", "values": ["sm", "md", "lg"] },
+    "variant": { "type": "enum", "values": ["outline", "filled"] },
+    "color": { "type": "enum", "values": ["green", "red"] }
+  },
+  "figmaBindings": [
+    {
+      "path": "Button > Main > Size",
+      "componentPath": "Button",
+      "groupName": "Main",
+      "propName": "Size",
+      "figmaType": "VARIANT",
+      "mappingKind": "direct",
+      "prop": "size",
+      "valueMap": { "Small": "sm", "Medium": "md", "Large": "lg" },
+      "figmaNodeId": "3:1"
+    },
+    {
+      "path": "Button > Main > Variant",
+      "componentPath": "Button",
+      "groupName": "Main",
+      "propName": "Variant",
+      "figmaType": "VARIANT",
+      "mappingKind": "direct",
+      "prop": "variant",
+      "figmaNodeId": "3:1"
+    },
+    {
+      "path": "Button > Main > Color",
+      "componentPath": "Button",
+      "groupName": "Main",
+      "propName": "Color",
+      "figmaType": "VARIANT",
+      "mappingKind": "direct",
+      "prop": "color",
+      "figmaNodeId": "3:1"
+    }
+  ]
+}

@@ -4,37 +4,36 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
-const gate = path.join(
-  root,
-  ".agents/skills/figma-implement-screen/scripts/figma-gate-screen-components-internal.mjs",
+const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+const skillDir = path.dirname(scriptDir);
+const fixtures = path.join(scriptDir, "fixtures");
+const gate = path.join(scriptDir, "figma-gate-screen-components-internal.mjs");
+const root = fs.mkdtempSync(path.join(os.tmpdir(), "figma-screen-components-host-"));
+fs.mkdirSync(path.join(root, ".agents/skills"), { recursive: true });
+fs.symlinkSync(skillDir, path.join(root, ".agents/skills/figma-implement-screen"), "dir");
+fs.cpSync(path.join(fixtures, "registry"), path.join(root, "registry"), { recursive: true });
+fs.mkdirSync(path.join(root, ".figma"), { recursive: true });
+fs.writeFileSync(
+  path.join(root, ".figma/layout-map.json"),
+  `${JSON.stringify({ schemaVersion: 1, mappings: [] }, null, 2)}\n`,
 );
-const fixtures = path.join(root, ".agents/skills/figma-implement-screen/scripts/fixtures");
+process.on("exit", () => fs.rmSync(root, { recursive: true, force: true }));
 function runGate(args) {
   return spawnSync(process.execPath, [gate, ...args], {
     cwd: root,
     encoding: "utf-8",
   });
 }
-function runStalePropMapCase() {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "figma-stale-prop-map-"));
-  const fixture = ".agents/skills/figma-implement-screen/scripts/fixtures/bad-stale-prop-map";
+function runStaleRegistryCase() {
+  const tempDir = fs.mkdtempSync(path.join(root, ".figma", "stale-registry-"));
   try {
-    return spawnSync(
-      "node",
-      [
-        ".agents/skills/figma-props-sync/scripts/figma-props-sync.cjs",
-        "extract-code",
-        "--ui-dir",
-        fixture,
-        "--cache-dir",
-        tempDir,
-        "--prop-map-dir",
-        `${fixture}/prop-map`,
-        "--fail-on-stale",
-      ],
-      { cwd: root, encoding: "utf-8" },
+    const artifact = JSON.parse(
+      fs.readFileSync(path.join(fixtures, "good-screen/component-resolution.json"), "utf-8"),
     );
+    artifact.resolved[0].registryEntry.contentHash = `sha256:${"0".repeat(64)}`;
+    const artifactPath = path.join(tempDir, "component-resolution.json");
+    fs.writeFileSync(artifactPath, `${JSON.stringify(artifact, null, 2)}\n`);
+    return runGate(["--artifact", artifactPath]);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
@@ -54,7 +53,7 @@ function runSpreadPropsCase() {
       artifactFile,
       `${JSON.stringify(
         {
-          schemaVersion: 5,
+          schemaVersion: 6,
           name: "pressure-spread",
           target: { kind: "screen", route: "/pressure" },
           source: { fileKey: "x", nodes: [{ id: "component", nodeId: "1:2" }] },
@@ -74,6 +73,11 @@ function runSpreadPropsCase() {
               codeComponent: "Button",
               importPath: "#/components/ui/button",
               decision: "reuse",
+              registryEntry: {
+                filePath: "registry/ui/Button.json",
+                contentHash:
+                  "sha256:9e771255deef595fe36c7f988dc8f9ee40fe16b2086ea64fe962d0106b0aa7b4",
+              },
             },
           ],
           unresolved: [],
@@ -190,10 +194,10 @@ const cases = [
     mustInclude: ["implementation file missing"],
   },
   {
-    name: "bad-stale-prop-map",
+    name: "bad-stale-registry-entry",
     expect: "FAIL",
-    run: runStalePropMapCase,
-    mustInclude: ["code API hash changed"],
+    run: runStaleRegistryCase,
+    mustInclude: ["registry entry contentHash mismatch"],
   },
   {
     name: "bad-spread-props",

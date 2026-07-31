@@ -1,0 +1,48 @@
+name: figma-screen-and-fidelity
+
+on:
+  pull_request:
+    paths:
+      - "packages/figma-fidelity/**"
+      - "skills/figma-implement-screen/**"
+      - ".github/workflows/figma-fidelity.yml"
+  push:
+    paths:
+      - "packages/figma-fidelity/**"
+      - "skills/figma-implement-screen/**"
+      - ".github/workflows/figma-fidelity.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/figma-fidelity
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.14.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: packages/figma-fidelity/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm test
+
+  screen-skill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.14.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci --prefix skills/figma-implement-screen/scripts
+      - run: node skills/figma-implement-screen/scripts/screen-config-pressure.mjs
+      - run: node skills/figma-implement-screen/scripts/figma-gate-screen-components-pressure.mjs
+      - run: node skills/figma-implement-screen/scripts/figma-gate-screen-pressure.mjs

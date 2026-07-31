@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { getFrameworkAdapter } from "./adapters/index.mjs";
 import { checkDoneGate } from "./lib/fidelity-done-gate.mjs";
-import { loadScreenConfig, packageScriptCommand } from "./screen-config.mjs";
+import { componentRegistryCommand, loadScreenConfig } from "./screen-config.mjs";
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const componentGate = path.join(scriptDir, "figma-gate-screen-components-internal.mjs");
 function fail(reasons) {
@@ -46,9 +46,6 @@ ${result.stderr ?? ""}`;
 ${output.trim()}`);
   }
 }
-function runPackageStep(packageCommand, label) {
-  runStep(packageCommand.command, packageCommand.args, label);
-}
 function canonicalize(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalize).join(",")}]`;
   if (value && typeof value === "object") {
@@ -83,6 +80,7 @@ function validateVisuals(artifact, reasons) {
       profile: contract.profile,
       selector: contract.scope === "region" ? contract.selector : void 0,
       expectSize: contract.scope === "region" ? contract.expectSize : void 0,
+      pageReason: contract.scope === "page" ? contract.pageReason : void 0,
     })),
     cwd: process.cwd(),
   });
@@ -140,8 +138,10 @@ function main() {
     fail([error instanceof Error ? error.message : String(error)]);
   }
   const frameworkName = config.framework === "react" ? "React" : config.framework;
-  if (artifact.target.kind !== "screen") {
-    fail([`figma-gate:screen requires target.kind=screen; got ${artifact.target.kind}`]);
+  if (artifact?.target?.kind !== "screen") {
+    fail([
+      `figma-gate:screen requires target.kind=screen; got ${String(artifact?.target?.kind)}`,
+    ]);
   }
   const designSystemComponents = [
     ...new Set(
@@ -150,26 +150,24 @@ function main() {
         .map((resolution) => resolution.codeComponent),
     ),
   ];
-  if (designSystemComponents.length > 0) {
-    runPackageStep(
-      packageScriptCommand(config.packageManager, "figma-props:check", [
-        "--components",
-        designSystemComponents.join(","),
-      ]),
-      "task prop-map freshness check",
-    );
-    runStep(
-      "node",
-      [
-        ".agents/skills/figma-props-sync/scripts/figma-props-sync.cjs",
-        "verify-source",
-        "--components",
-        designSystemComponents.join(","),
-      ],
-      "current Figma prop-source check",
-    );
-  }
   runStep(process.execPath, [componentGate, "--artifact", artifactPath], "component contract gate");
+  if (designSystemComponents.length > 0) {
+    if (!fs.existsSync(config.componentRegistryCli)) {
+      fail([`component registry CLI missing: ${config.componentRegistryCli}`]);
+    }
+    const driftCheck = componentRegistryCommand(
+      config,
+      "check",
+      designSystemComponents,
+    );
+    runStep(driftCheck.command, driftCheck.args, "task component registry drift check");
+    const sourceCheck = componentRegistryCommand(
+      config,
+      "verify-source",
+      designSystemComponents,
+    );
+    runStep(sourceCheck.command, sourceCheck.args, "current Figma component-source check");
+  }
   const reasons = [];
   const relativeArtifactPath = path.relative(process.cwd(), artifactPath).replace(/\\/g, "/");
   if (
@@ -208,7 +206,7 @@ function main() {
   console.log(`implementation-files: ${artifact.implementationFiles.length}`);
   console.log(`visual-contracts-done: ${visualContracts}`);
   console.log(
-    "gates: inventory, prop-map, components, ownership, visual-done",
+    "gates: inventory, component-registry, components, ownership, visual-done",
   );
   console.log("review: developer code review + visual diff + manual UI test required");
 }
