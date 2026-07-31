@@ -192,7 +192,7 @@ redundant. If sets differ semantically or code domain is unknown, provide comple
 
 ## Ambiguous `exportName` across areas
 
-Registry lookups by `exportName` (used by `verify-source` and `check --components`) scan every `registry/<area>/*.json` file and match on `component.exportName`, not on file path. If two or more registry files across different areas share the same `exportName` — e.g. `registry/ui/Button.json` and `registry/marketing/Button.json` both have `"exportName": "Button"` — the lookup fails loud instead of silently picking one: it throws an error listing every matching relative path, for example `ambiguous exportName "Button" matches 2 registry files: marketing/Button.json, ui/Button.json — disambiguate with a full registry path`.
+`verify-source --components <ExportName,...>` resolves each requested export by scanning every `registry/<area>/*.json` file and matching on `component.exportName`, not on file path (`check --components` instead derives the registry path directly from each extracted source file, so it never hits this scan). If two or more registry files across different areas share the same `exportName` — e.g. `registry/ui/Button.json` and `registry/marketing/Button.json` both have `"exportName": "Button"` — the lookup fails loud instead of silently picking one: it throws an error listing every matching relative path, for example `ambiguous exportName "Button" matches 2 registry files: marketing/Button.json, ui/Button.json — disambiguate with a full registry path`.
 
 ## Finalize rejects
 
