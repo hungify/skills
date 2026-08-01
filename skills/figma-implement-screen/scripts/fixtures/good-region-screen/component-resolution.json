@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 3,
+  "name": "good-region-screen",
+  "target": { "kind": "screen", "route": "/fixture" },
+  "source": { "fileKey": "x", "nodes": [{ "id": "desktop", "nodeId": "1:2" }] },
+  "detectedComponents": [
+    { "sourceId": "desktop", "nodeId": "2:1", "name": "Button", "kind": "design-system" }
+  ],
+  "implementationFiles": [
+    ".agents/skills/figma-implement-screen/scripts/fixtures/good-button/GoodButton.tsx"
+  ],
+  "resolved": [
+    {
+      "kind": "design-system",
+      "figmaNodes": ["2:1"],
+      "codeComponent": "Button",
+      "importPath": "#/components/ui/button",
+      "decision": "reuse",
+      "registryEntry": { "filePath": "registry/ui/Button.json", "contentHash": "sha256:9e771255deef595fe36c7f988dc8f9ee40fe16b2086ea64fe962d0106b0aa7b4" }
+    }
+  ],
+  "unresolved": [],
+  "screenCompositions": [],
+  "assets": [],
+  "visualContracts": [
+    {
+      "id": "desktop.region.fixture-card",
+      "sourceId": "desktop",
+      "sourceNodeId": "1:2",
+      "goldNodeId": "1:3",
+      "role": "primary",
+      "scope": "region",
+      "region": "fixture-card",
+      "viewport": { "name": "desktop", "width": 1440, "height": 1024 },
+      "outDir": ".figma/artifacts/fixtures/good-region-screen/desktop/regions/fixture-card",
+      "profile": "component/strict",
+      "selector": "[data-testid=\"fixture\"]",
+      "expectSize": { "width": 544, "height": 464 }
+    },
+    {
+      "id": "desktop.page",
+      "sourceId": "desktop",
+      "sourceNodeId": "1:2",
+      "goldNodeId": "1:2",
+      "role": "supplemental",
+      "scope": "page",
+      "viewport": { "name": "desktop", "width": 1440, "height": 1024 },
+      "outDir": ".figma/artifacts/fixtures/good-region-screen/desktop/page",
+      "profile": "page",
+      "pageReason": "The requested frame includes shared chrome around the primary region"
+    }
+  ]
+}

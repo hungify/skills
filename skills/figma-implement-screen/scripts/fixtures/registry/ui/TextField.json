@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 3,
+  "component": {
+    "exportName": "TextField",
+    "exportType": "named",
+    "filePath": "src/components/ui/input.tsx"
+  },
+  "figma": {
+    "componentPath": "Text field",
+    "lastKnownFileKey": "pressure-file",
+    "lastKnownNodeId": "3:2"
+  },
+  "codePropsMap": {},
+  "figmaBindings": []
+}

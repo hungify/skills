@@ -1,0 +1,52 @@
+name: figloom-verify-and-figma-skills
+
+on:
+  pull_request:
+    paths:
+      - "packages/figloom-verify/**"
+      - "skills/figma-verify-visual/**"
+      - "skills/figma-implement-screen/**"
+      - ".github/workflows/figloom-verify.yml"
+  push:
+    paths:
+      - "packages/figloom-verify/**"
+      - "skills/figma-verify-visual/**"
+      - "skills/figma-implement-screen/**"
+      - ".github/workflows/figloom-verify.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/figloom-verify
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.14.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: packages/figloom-verify/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm test
+
+  screen-skill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.14.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci --prefix skills/figma-implement-screen/scripts
+      - run: node skills/figma-implement-screen/scripts/screen-config-pressure.mjs
+      - run: node skills/figma-implement-screen/scripts/figma-gate-screen-components-pressure.mjs
+      - run: node skills/figma-implement-screen/scripts/figma-gate-screen-pressure.mjs
+      - run: jq -e '.skill_name == "figma-verify-visual" and (.evals | length) >= 6 and all(.evals[]; (.expectations | length) > 0)' skills/figma-verify-visual/evals/evals.json
+      - run: jq -e '.skill_name == "figma-implement-screen" and (.evals | length) >= 8 and all(.evals[]; (.expectations | length) > 0)' skills/figma-implement-screen/evals/evals.json

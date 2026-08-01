@@ -1,0 +1,12 @@
+interface:
+  display_name: "Figma Implement Screen"
+  short_description: "Implement Figma web screens with gated evidence"
+  default_prompt: "Use $figma-implement-screen to build this Figma web screen with registry reuse, preserved behavior, and verified visual evidence."
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "figma"
+      description: "Figma design context, screenshots, metadata, and assets"
+      transport: "streamable_http"
+      url: "https://mcp.figma.com/mcp"

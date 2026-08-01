@@ -1,0 +1,56 @@
+{
+  "name": "figloom-verify",
+  "version": "0.3.0",
+  "description": "CLI-first Figma-to-code visual verification with stable capture, multi-signal comparison, and artifact-based done gates.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hungify/skills.git",
+    "directory": "packages/figloom-verify"
+  },
+  "homepage": "https://github.com/hungify/skills/tree/main/packages/figloom-verify",
+  "bugs": {
+    "url": "https://github.com/hungify/skills/issues"
+  },
+  "bin": {
+    "figloom": "./bin/figloom.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "docs",
+    "README.md",
+    "LICENSE",
+    ".githooks"
+  ],
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "packageManager": "pnpm@11.14.0",
+
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "verify": "tsx src/cli.ts verify",
+    "done-gate": "tsx src/cli.ts done-gate",
+    "fetch-gold": "tsx scripts/fetch-gold.ts",
+    "capture": "tsx scripts/capture.ts",
+    "crop": "tsx scripts/crop.ts"
+  },
+  "dependencies": {
+    "@playwright/test": "^1.61.1",
+    "pixelmatch": "^7.2.0",
+    "pngjs": "^7.0.0",
+    "ssim.js": "^3.5.0",
+    "tsx": "^4.22.4",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "26.0.1",
+    "@types/pixelmatch": "^5.2.6",
+    "@types/pngjs": "^6.0.5",
+    "typescript": "6.0.3",
+    "vitest": "^4.1.10"
+  }
+}

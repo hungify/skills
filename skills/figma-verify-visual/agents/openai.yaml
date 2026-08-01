@@ -1,0 +1,4 @@
+interface:
+  display_name: "Figma Visual Verify"
+  short_description: "Verify rendered code against exact Figma nodes"
+  default_prompt: "Use $figma-verify-visual to compare this rendered implementation with the supplied Figma node and report visual evidence."

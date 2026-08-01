@@ -1,0 +1,8 @@
+{
+  "framework": "vue",
+  "packageManager": "pnpm",
+  "pathAliases": {
+    "#/": "src/"
+  },
+  "screensGlob": "src/features/*/screens/*/"
+}
