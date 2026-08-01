@@ -16,7 +16,7 @@ Source syntax is adapter-owned. `.figma/screen.config.json` selects framework, p
 
 ```json
 {
-  "schemaVersion": 7,
+  "schemaVersion": 3,
   "name": "login",
   "target": { "kind": "screen", "route": "/login" },
   "source": {

@@ -93,9 +93,9 @@ function validateVisuals(artifact, config, reasons) {
   }
   const verification = readJson(verificationPath);
   if (
-    verification.schemaVersion !== 1 ||
+    verification.schemaVersion !== 3 ||
     verification.kind !== "figloom.visual-verification" ||
-    verification.request?.schemaVersion !== 1 ||
+    verification.request?.schemaVersion !== 3 ||
     typeof verification.request?.url !== "string" ||
     !Array.isArray(verification.request?.contracts) ||
     !Array.isArray(verification.results)

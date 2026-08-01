@@ -33,12 +33,12 @@ describe("CLI verification contract", () => {
     run.mockResolvedValue({ ok: true, pass: true });
 
     const artifact = await verify(
-      { schemaVersion: 1, url: "http://127.0.0.1:3000/login", contracts: [pageContract] },
+      { schemaVersion: 3, url: "http://127.0.0.1:3000/login", contracts: [pageContract] },
       { projectRoot: "/repo", now: () => new Date("2026-08-01T00:00:00.000Z") },
     );
 
     expect(artifact).toMatchObject({
-      schemaVersion: 1,
+      schemaVersion: 3,
       kind: "figloom.visual-verification",
       ok: true,
       allPassed: true,
@@ -54,7 +54,7 @@ describe("CLI verification contract", () => {
     fetchGold.mockResolvedValue({ ok: false, fetched: false, message: "token rejected" });
 
     const artifact = await verify(
-      { schemaVersion: 1, url: "http://127.0.0.1:3000/login", contracts: [pageContract] },
+      { schemaVersion: 3, url: "http://127.0.0.1:3000/login", contracts: [pageContract] },
       { projectRoot: "/repo" },
     );
 
@@ -69,7 +69,7 @@ describe("CLI verification contract", () => {
   it("rejects batches larger than eight contracts", () => {
     expect(() =>
       verificationRequestSchema.parse({
-        schemaVersion: 1,
+        schemaVersion: 3,
         url: "http://127.0.0.1:3000",
         contracts: Array.from({ length: 9 }, (_, index) => ({
           ...pageContract,
@@ -82,7 +82,7 @@ describe("CLI verification contract", () => {
   it("rejects duplicate contract ids", () => {
     expect(() =>
       verificationRequestSchema.parse({
-        schemaVersion: 1,
+        schemaVersion: 3,
         url: "http://127.0.0.1:3000",
         contracts: [pageContract, pageContract],
       }),
@@ -91,12 +91,12 @@ describe("CLI verification contract", () => {
 
   it("keeps a failed verification result blocked at done gate", () => {
     const verdict = doneGateFromArtifact({
-      schemaVersion: 1,
+      schemaVersion: 3,
       kind: "figloom.visual-verification",
       createdAt: "2026-08-01T00:00:00.000Z",
       projectRoot: "/repo",
       request: {
-        schemaVersion: 1,
+        schemaVersion: 3,
         url: "http://127.0.0.1:3000/login",
         contracts: [pageContract],
       },
@@ -121,12 +121,12 @@ describe("CLI verification contract", () => {
   it("rejects aggregate verdict inconsistent with contract results", () => {
     expect(() =>
       verificationArtifactSchema.parse({
-        schemaVersion: 1,
+        schemaVersion: 3,
         kind: "figloom.visual-verification",
         createdAt: "2026-08-01T00:00:00.000Z",
         projectRoot: "/repo",
         request: {
-          schemaVersion: 1,
+          schemaVersion: 3,
           url: "http://127.0.0.1:3000/login",
           contracts: [pageContract],
         },

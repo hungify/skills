@@ -211,11 +211,11 @@ function writeVerificationArtifact(filePath, url, contracts) {
     ...(contract.scope === "region" ? { profile: contract.profile } : {}),
   }));
   writeJson(path.join(root, filePath), {
-    schemaVersion: 1,
+    schemaVersion: 3,
     kind: "figloom.visual-verification",
     createdAt: new Date().toISOString(),
     projectRoot: root,
-    request: { schemaVersion: 1, url, contracts: requestContracts },
+    request: { schemaVersion: 3, url, contracts: requestContracts },
     ok: true,
     allPassed: true,
     results: requestContracts.map((contract) => ({
@@ -308,7 +308,7 @@ function main() {
     const visualOutDir = `${verificationRoot}/component/page`;
     makeVisualEvidence(visualOutDir);
     const artifact = {
-      schemaVersion: 7,
+      schemaVersion: 3,
       name: "pressure-unified",
       target: { kind: "screen", route: "/pressure" },
       source: { fileKey: "x", nodes: [{ id: "component", nodeId: "1:2" }] },

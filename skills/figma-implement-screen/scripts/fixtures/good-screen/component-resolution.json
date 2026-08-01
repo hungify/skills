@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 7,
+  "schemaVersion": 3,
   "name": "good-screen",
   "target": { "kind": "screen", "route": "/fixture" },
   "source": { "fileKey": "x", "nodes": [{ "id": "desktop", "nodeId": "1:2" }] },

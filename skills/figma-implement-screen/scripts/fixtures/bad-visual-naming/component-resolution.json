@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 7,
+  "schemaVersion": 3,
   "name": "bad-visual-naming",
   "target": { "kind": "screen", "route": "/fixture" },
   "source": { "fileKey": "x", "nodes": [{ "intent": "desktop", "nodeId": "1:2" }] },

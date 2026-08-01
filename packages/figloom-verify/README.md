@@ -17,7 +17,7 @@ Create a contract:
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 3,
   "url": "http://127.0.0.1:3000/login",
   "contracts": [
     {

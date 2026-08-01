@@ -92,7 +92,7 @@ export async function verify(
   }
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 3,
     kind: "figloom.visual-verification",
     createdAt: (options.now?.() ?? new Date()).toISOString(),
     projectRoot,

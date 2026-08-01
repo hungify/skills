@@ -65,7 +65,7 @@ export const verificationContractSchema = z
 
 export const verificationRequestSchema = z
   .object({
-    schemaVersion: z.literal(1),
+    schemaVersion: z.literal(3),
     url: z.string().url(),
     contracts: z.array(verificationContractSchema).min(1).max(8),
   })
@@ -97,7 +97,7 @@ const verificationResultSchema = z
 
 export const verificationArtifactSchema = z
   .object({
-    schemaVersion: z.literal(1),
+    schemaVersion: z.literal(3),
     kind: z.literal("figloom.visual-verification"),
     createdAt: z.string().datetime(),
     projectRoot: z.string().min(1),

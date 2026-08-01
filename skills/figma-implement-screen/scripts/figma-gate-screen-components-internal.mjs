@@ -185,7 +185,7 @@ const pageVisualContractSchema = z
   .strict();
 const componentResolutionArtifactSchema = z
   .object({
-    schemaVersion: z.literal(7),
+    schemaVersion: z.literal(3),
     name: z.string().min(1),
     target: z.object({ kind: z.literal("screen"), route: z.string().startsWith("/") }).strict(),
     source: z
