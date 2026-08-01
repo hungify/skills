@@ -15,7 +15,7 @@ browser settings, application commit, and font inputs for both runs.
 Build it from this directory:
 
 ```bash
-docker build -t figma-fidelity-capture:v1.61.1 .
+docker build -t figloom-capture:v1.61.1 .
 ```
 
 The image wraps the existing `pnpm capture` command. Mount an output directory
@@ -24,7 +24,7 @@ and use `host.docker.internal` when the app is running on the host:
 ```bash
 docker run --rm \
   -v "$PWD/artifacts:/workspace/artifacts" \
-  figma-fidelity-capture:v1.61.1 \
+figloom-capture:v1.61.1 \
   http://host.docker.internal:3000/login \
   /workspace/artifacts/login.png \
   1440x1024 \

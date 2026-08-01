@@ -20,6 +20,6 @@ RUN corepack enable && pnpm install --frozen-lockfile
 
 COPY . .
 
-# Arguments are passed to the package's existing debug capture command:
+# Arguments are passed to the package's low-level capture command:
 #   docker run --rm <image> <url> <out.png> <width>x<height> [selector]
 ENTRYPOINT ["pnpm", "capture", "--"]

@@ -184,7 +184,7 @@ export function checkDoneGate(options: DoneGateOptions): DoneGateVerdict {
     } else if (goldFetchedAtMs > now + CLOCK_SKEW_MS) {
       reasons.push("gold fetchedAt is in future.");
     } else if (now - goldFetchedAtMs > maxGoldAge) {
-      reasons.push(`gold older than ${Math.round(maxGoldAge / 3_600_000)}h; re-run fidelity_verify.`);
+      reasons.push(`gold older than ${Math.round(maxGoldAge / 3_600_000)}h; re-run figloom verify.`);
     } else if (Number.isFinite(capturedAtMs) && goldFetchedAtMs > capturedAtMs + CLOCK_SKEW_MS) {
       reasons.push("gold fetchedAt is later than capture.");
     }

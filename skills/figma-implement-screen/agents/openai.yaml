@@ -10,6 +10,3 @@ dependencies:
       description: "Figma design context, screenshots, metadata, and assets"
       transport: "streamable_http"
       url: "https://mcp.figma.com/mcp"
-    - type: "mcp"
-      value: "figma-fidelity"
-      description: "Fresh gold, stable capture, visual comparison, and done-gate evidence"

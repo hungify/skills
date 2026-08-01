@@ -1,18 +1,18 @@
 {
-  "name": "figma-fidelity",
-  "version": "0.2.0",
-  "description": "MCP-first Figma visual fidelity engine: multi-signal compare, scope guards, stability check, artifact-based done-gate.",
+  "name": "figloom-verify",
+  "version": "0.3.0",
+  "description": "CLI-first Figma-to-code visual verification with stable capture, multi-signal comparison, and artifact-based done gates.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/hungify/skills.git",
-    "directory": "packages/figma-fidelity"
+    "directory": "packages/figloom-verify"
   },
-  "homepage": "https://github.com/hungify/skills/tree/main/packages/figma-fidelity",
+  "homepage": "https://github.com/hungify/skills/tree/main/packages/figloom-verify",
   "bugs": {
     "url": "https://github.com/hungify/skills/issues"
   },
   "bin": {
-    "figma-fidelity": "./bin/figma-fidelity.js"
+    "figloom": "./bin/figloom.js"
   },
   "files": [
     "bin",
@@ -32,14 +32,13 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "setup": "tsx src/cli.ts setup",
-    "mcp": "tsx src/cli.ts mcp",
+    "verify": "tsx src/cli.ts verify",
+    "done-gate": "tsx src/cli.ts done-gate",
     "fetch-gold": "tsx scripts/fetch-gold.ts",
     "capture": "tsx scripts/capture.ts",
     "crop": "tsx scripts/crop.ts"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
     "@playwright/test": "^1.61.1",
     "pixelmatch": "^7.2.0",
     "pngjs": "^7.0.0",

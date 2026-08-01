@@ -26,6 +26,37 @@ fs.writeFileSync(
   'console.log("PASS component registry pressure stub");\n',
 );
 fs.mkdirSync(path.join(root, ".figma"), { recursive: true });
+const visualVerifyStub = path.join(root, "figloom-pressure-stub.mjs");
+fs.writeFileSync(
+  visualVerifyStub,
+  `#!/usr/bin/env node
+import fs from "node:fs";
+import path from "node:path";
+const args = process.argv.slice(2);
+const artifactPath = args[args.indexOf("--artifact") + 1];
+const artifact = JSON.parse(fs.readFileSync(artifactPath, "utf8"));
+const reasons = [];
+for (const contract of artifact.request.contracts) {
+  const outDir = path.resolve(artifact.projectRoot, contract.outDir);
+  const score = JSON.parse(fs.readFileSync(path.join(outDir, "visual-score.json"), "utf8"));
+  const meta = JSON.parse(fs.readFileSync(path.join(outDir, "run-meta.json"), "utf8"));
+  const profile = contract.scope.kind === "page" ? "page" : (contract.profile ?? "component/strict");
+  if (score.pass !== true) reasons.push(contract.id + ": pass is not true.");
+  if (score.profile !== profile) reasons.push(contract.id + ": profile does not match contract.");
+  if (meta.runType !== "final") reasons.push(contract.id + ": run-meta runType must be final.");
+  if (meta.viewportSize?.width !== contract.viewport.width || meta.viewportSize?.height !== contract.viewport.height) {
+    reasons.push(contract.id + ": run-meta viewportSize mismatch.");
+  }
+}
+console.log(JSON.stringify({ done: reasons.length === 0, reasons }, null, 2));
+process.exit(reasons.length === 0 ? 0 : 1);
+`,
+);
+fs.chmodSync(visualVerifyStub, 0o755);
+fs.writeFileSync(
+  path.join(root, ".figma/screen.config.json"),
+  `${JSON.stringify({ visualVerifyCli: visualVerifyStub }, null, 2)}\n`,
+);
 fs.writeFileSync(
   path.join(root, ".figma/layout-map.json"),
   `${JSON.stringify({ schemaVersion: 1, mappings: [] }, null, 2)}\n`,
@@ -166,6 +197,36 @@ function makeVisualEvidence(outDir) {
     items: [],
   });
 }
+function writeVerificationArtifact(filePath, url, contracts) {
+  const requestContracts = contracts.map((contract) => ({
+    id: contract.id,
+    fileKey: "x",
+    nodeId: contract.goldNodeId,
+    viewport: contract.viewport,
+    outDir: contract.outDir,
+    scope:
+      contract.scope === "page"
+        ? { kind: "page", pageReason: contract.pageReason }
+        : { kind: "region", selector: contract.selector, expectSize: contract.expectSize },
+    ...(contract.scope === "region" ? { profile: contract.profile } : {}),
+  }));
+  writeJson(path.join(root, filePath), {
+    schemaVersion: 1,
+    kind: "figloom.visual-verification",
+    createdAt: new Date().toISOString(),
+    projectRoot: root,
+    request: { schemaVersion: 1, url, contracts: requestContracts },
+    ok: true,
+    allPassed: true,
+    results: requestContracts.map((contract) => ({
+      id: contract.id,
+      ok: true,
+      pass: true,
+      outDir: path.resolve(root, contract.outDir),
+    })),
+  });
+  return sha256(fs.readFileSync(path.join(root, filePath)));
+}
 function main() {
   fs.mkdirSync(absoluteArtifactRoot, { recursive: true });
   try {
@@ -243,10 +304,11 @@ function main() {
     ) {
       throw new Error("raw inventory did not exclude hidden node deterministically");
     }
-    const visualOutDir = `${artifactRoot}/component/page`;
+    const verificationRoot = `.figma/artifacts/visual-verifications/pressure/unified-${process.pid}`;
+    const visualOutDir = `${verificationRoot}/component/page`;
     makeVisualEvidence(visualOutDir);
     const artifact = {
-      schemaVersion: 6,
+      schemaVersion: 7,
       name: "pressure-unified",
       target: { kind: "screen", route: "/pressure" },
       source: { fileKey: "x", nodes: [{ id: "component", nodeId: "1:2" }] },
@@ -289,6 +351,15 @@ function main() {
         },
       ],
     };
+    const verificationPath = `${verificationRoot}/visual-verification.json`;
+    artifact.visualVerification = {
+      artifactPath: verificationPath,
+      contentHash: writeVerificationArtifact(
+        verificationPath,
+        "http://127.0.0.1:3000/pressure",
+        artifact.visualContracts,
+      ),
+    };
     const artifactPath = path.join(absoluteArtifactRoot, "screen-implementation.json");
     writeJson(artifactPath, artifact);
     const regionArtifact = {
@@ -303,7 +374,7 @@ function main() {
           scope: "region",
           region: "button",
           viewport: { name: "desktop", width: 1440, height: 1024 },
-          outDir: `${artifactRoot}/component/regions/button`,
+          outDir: `${verificationRoot}/component/regions/button`,
           profile: "component/strict",
           selector: '[data-testid="fixture"]',
           expectSize: { width: 160, height: 48 },
@@ -640,7 +711,7 @@ function main() {
       "visual-quality-blocks-handoff",
       runNode(path.join(screenScripts, "figma-gate-screen.mjs"), ["--artifact", artifactPath]),
       "FAIL",
-      "visual contract component.page quality blocked",
+      "component.page: pass is not true.",
     );
     writeJson(scorePath, score);
     const runMetaPath = path.join(root, visualOutDir, "run-meta.json");

@@ -16,7 +16,7 @@ Source syntax is adapter-owned. `.figma/screen.config.json` selects framework, p
 
 ```json
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "name": "login",
   "target": { "kind": "screen", "route": "/login" },
   "source": {
@@ -79,12 +79,16 @@ Source syntax is adapter-owned. `.figma/screen.config.json` selects framework, p
       "scope": "region",
       "region": "login-card",
       "viewport": { "name": "desktop", "width": 1440, "height": 1024 },
-      "outDir": ".figma/artifacts/screens/auth/login/desktop/regions/login-card",
+      "outDir": ".figma/artifacts/visual-verifications/login/run-1/desktop/regions/login-card",
       "profile": "component/strict",
       "selector": "[data-testid=\"auth.login\"]",
       "expectSize": { "width": 544, "height": 464 }
     }
-  ]
+  ],
+  "visualVerification": {
+    "artifactPath": ".figma/artifacts/visual-verifications/login/run-1/visual-verification.json",
+    "contentHash": "sha256:..."
+  }
 }
 ```
 
@@ -101,7 +105,7 @@ Source syntax is adapter-owned. `.figma/screen.config.json` selects framework, p
 - `entryComponents[]` and `screenCompositions[]` own local adapter-recognized roots in scanned files.
 - Every requested source has exactly one primary visual contract. Supplemental page contracts add chrome evidence.
 - Page gold equals source node. Region gold must be visible descendant.
-- Every declared visual contract must have complete, fresh, hash-bound fidelity evidence, engine `pass=true`, and no blocking residual cluster. Missing, mismatched, or quality-blocked evidence fails. Developer still reviews non-blocking residuals and crop usefulness.
+- `visualVerification` pins CLI-owned `visual-verification.json` by repo-relative path and SHA-256. Verification request must exactly cover declared screen contracts. `figloom done-gate` must confirm complete, fresh, hash-bound evidence, engine `pass=true`, and no blocking residual cluster.
 - Unknown keys, duplicate identities, raw primitive substitutions, stale registry evidence, adapter analysis failures, and missing files fail.
 
 ## Developer judgment

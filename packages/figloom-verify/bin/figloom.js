@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-/**
- * Package bin — loads TypeScript CLI via tsx (runtime dependency).
- */
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import * as path from "node:path";
@@ -15,7 +12,7 @@ let tsxCli;
 try {
   tsxCli = require.resolve("tsx/cli");
 } catch {
-  console.error("figma-fidelity: missing dependency `tsx`. Run: pnpm add tsx");
+  console.error("figloom-verify: missing dependency `tsx`. Run: pnpm add tsx");
   process.exit(1);
 }
 

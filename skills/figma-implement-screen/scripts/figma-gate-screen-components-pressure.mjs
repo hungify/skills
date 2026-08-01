@@ -53,7 +53,7 @@ function runSpreadPropsCase() {
       artifactFile,
       `${JSON.stringify(
         {
-          schemaVersion: 6,
+          schemaVersion: 7,
           name: "pressure-spread",
           target: { kind: "screen", route: "/pressure" },
           source: { fileKey: "x", nodes: [{ id: "component", nodeId: "1:2" }] },

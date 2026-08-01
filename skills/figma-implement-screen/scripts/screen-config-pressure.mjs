@@ -14,6 +14,7 @@ import {
   matchesScreensGlob,
   normalizeImportPath,
   packageScriptCommand,
+  visualVerifyCommand,
 } from "./screen-config.mjs";
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const fixtures = path.join(scriptDir, "fixtures");
@@ -117,8 +118,16 @@ expect(
   DEFAULT_SCREEN_CONFIG.framework === "react" &&
     DEFAULT_SCREEN_CONFIG.packageManager === "pnpm" &&
     DEFAULT_SCREEN_CONFIG.pathAliases["#/"] === "src/" &&
+    DEFAULT_SCREEN_CONFIG.visualVerifyCli === "figloom" &&
     DEFAULT_SCREEN_CONFIG.componentRegistryCli.endsWith("figma-component-registry.mjs"),
   JSON.stringify(DEFAULT_SCREEN_CONFIG),
+);
+const verifyCommand = visualVerifyCommand(DEFAULT_SCREEN_CONFIG, "verification.json");
+expect(
+  "visual verification uses CLI done gate",
+  verifyCommand.command === "figloom" &&
+    verifyCommand.args.join(" ") === "done-gate --artifact verification.json",
+  JSON.stringify(verifyCommand),
 );
 const registryCommand = componentRegistryCommand(DEFAULT_SCREEN_CONFIG, "check", [
   "Button",

@@ -43,6 +43,15 @@ const evidenceSchema = z
     contentHash: z.string().regex(/^sha256:[a-f0-9]{64}$/),
   })
   .strict();
+const visualVerificationSchema = z
+  .object({
+    artifactPath: z
+      .string()
+      .regex(REPO_RELATIVE_PATH, "expected repo-relative path")
+      .startsWith(".figma/artifacts/visual-verifications/"),
+    contentHash: z.string().regex(/^sha256:[a-f0-9]{64}$/),
+  })
+  .strict();
 const ignoredInventoryIdentity = {
   sourceId: z.string().regex(OUTPUT_ID, "expected lowercase kebab-case source id"),
   nodeId: z.string().regex(FIGMA_NODE_ID, "expected Figma node id like 1:2"),
@@ -176,7 +185,7 @@ const pageVisualContractSchema = z
   .strict();
 const componentResolutionArtifactSchema = z
   .object({
-    schemaVersion: z.literal(6),
+    schemaVersion: z.literal(7),
     name: z.string().min(1),
     target: z.object({ kind: z.literal("screen"), route: z.string().startsWith("/") }).strict(),
     source: z
@@ -225,6 +234,7 @@ const componentResolutionArtifactSchema = z
     visualContracts: z.array(
       z.discriminatedUnion("scope", [regionVisualContractSchema, pageVisualContractSchema]),
     ),
+    visualVerification: visualVerificationSchema.optional(),
   })
   .strict();
 const inventoryFileSchema = z

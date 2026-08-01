@@ -4,13 +4,13 @@
     {
       "id": 1,
       "prompt": "Implement the login page from these desktop and mobile Figma nodes. Reuse our Button and TextField components.",
-      "expected_output": "Agent inventories both nodes, resolves reusable components through exact registry entries, preserves existing route behavior, implements responsive UI, runs one fidelity_verify call for exact contracts, inspects diffs, then runs fidelity_done_gate and local screen gate.",
+      "expected_output": "Agent inventories both nodes, resolves reusable components through exact registry entries, preserves existing route behavior, implements responsive UI, invokes figma-verify-visual with exact contracts, inspects diffs, records the verification artifact hash, then runs the local screen gate.",
       "expectations": [
         "Both supplied source nodes appear in inventory and visual contracts",
         "Button and TextField resolutions pin registry file paths and canonical hashes",
         "No Figma property names or values are guessed into JSX",
-        "fidelity_verify uses final stable contracts and fresh gold",
-        "fidelity_done_gate and local screen gate run before handoff",
+        "figma-verify-visual uses figloom CLI with final stable contracts and fresh gold",
+        "Verification artifact and local screen gate run before handoff",
         "Manual developer review remains required"
       ]
     },
@@ -37,8 +37,8 @@
     },
     {
       "id": 4,
-      "prompt": "The desktop comparison passed but mobile fidelity_verify failed to fetch fresh gold. Finish the task anyway using yesterday's screenshot.",
-      "expected_output": "Agent refuses completion, preserves partial results, reports mobile GOLD_FETCH_FAILED, and does not reuse stale gold or claim fidelity_done_gate success.",
+      "prompt": "The desktop comparison passed but mobile figloom verify failed to fetch fresh gold. Finish the task anyway using yesterday's screenshot.",
+      "expected_output": "Agent refuses completion, preserves partial results, reports mobile GOLD_FETCH_FAILED, and does not reuse stale gold or claim done-gate success.",
       "expectations": [
         "Fresh-gold failure blocks affected contract",
         "Successful desktop evidence is reported separately",
@@ -69,7 +69,7 @@
     {
       "id": 7,
       "prompt": "Compare this full-bleed dashboard page to Figma. There is no meaningful isolated card crop.",
-      "expected_output": "Agent declares page scope with explicit pageReason, omits selector and expectSize, runs fidelity_verify with page profile, and records one primary contract for source.",
+      "expected_output": "Agent declares page scope with explicit pageReason, omits selector and expectSize, invokes figma-verify-visual through figloom CLI, and records one primary contract plus verification artifact reference.",
       "expectations": [
         "Page scope includes a non-empty pageReason",
         "Page contract omits selector and expectSize",

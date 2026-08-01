@@ -50,11 +50,12 @@ Read `.figma/screen.config.json` when present:
 	"packageManager": "pnpm",
 	"pathAliases": { "#/": "src/" },
 	"screensGlob": "src/features/*/screens/*/",
-	"componentRegistryCli": ".agents/skills/figma-component-registry/scripts/figma-component-registry.mjs"
+	"componentRegistryCli": ".agents/skills/figma-component-registry/scripts/figma-component-registry.mjs",
+	"visualVerifyCli": "figloom"
 }
 ```
 
-No config preserves current defaults exactly: React, pnpm, `#/` → `src/`, and `src/features/*/screens/*/`.
+No config preserves current defaults exactly: React, pnpm, `#/` → `src/`, `src/features/*/screens/*/`, and installed `figloom` CLI.
 
 Run every skill executable as native ESM (`.mjs`) with `node`; do not require `tsx` or TypeScript runtime scripts. Source analysis runs through runtime-validated adapters in `scripts/adapters/`. Only `react` is implemented in v2; it scans target `.tsx` and `.jsx` source through compiler AST. Never treat an unknown framework as unscanned success. Stop on `framework adapter unavailable` until a real adapter exists.
 
@@ -126,10 +127,11 @@ Before gate, inventory every locally declared adapter-recognized root in scanned
 
 For every requested mobile/desktop/state node:
 
-1. Call `fidelity_verify` once with 1–8 exact contracts. It fetches fresh gold, captures stable final UI, compares, and writes evidence.
-2. Inspect every returned `diff.png` and `topIssues`; `allPassed=true` is necessary but does not replace inspection.
-3. Fix mismatches and rerun affected contracts only, maximum three rounds.
-4. Call `fidelity_done_gate` with exact screen contracts before local unified gate.
+1. Declare exact `visualContracts[]` in screen artifact.
+2. Use `$figma-verify-visual` to run `figloom verify` independently and inspect every diff.
+3. Record CLI-owned `visualVerification.artifactPath` plus SHA-256 content hash in screen artifact.
+4. Fix implementation mismatches and invoke verification again for affected contracts only, maximum three rounds.
+5. Run local unified gate; it checks screen-to-verification contract identity then calls `figloom done-gate`.
 
 Use a primary-content crop when it gives useful review evidence; add page comparison when chrome matters. A region can be a form/content group even when no card or surface exists. Geometry may suggest crops but does not replace developer judgment.
 
@@ -161,5 +163,6 @@ Manual QA: required
 
 - Design-system component → `figma-implement-component`.
 - Registry-only → `figma-component-registry`.
+- Visual audit without implementation → `figma-verify-visual`.
 - Figma canvas writes → Figma authoring tools.
 - Developer owns final approval and manual UI test.

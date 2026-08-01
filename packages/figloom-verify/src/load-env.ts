@@ -1,6 +1,6 @@
 /**
  * Load FIGMA_ACCESS_TOKEN (and other keys) from ancestor `.env` / `.env.local` files.
- * MCP often starts without the user's shell env — never write tokens into mcp.json.
+ * CLI may start from an editor without the user's interactive shell environment.
  * Does not override variables already set in the process environment.
  */
 import * as fs from "node:fs";

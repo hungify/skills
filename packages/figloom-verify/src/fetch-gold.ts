@@ -1,7 +1,7 @@
 /**
  * fetch-gold: Figma Images API → gold PNG on disk + figma-gold.meta.json sidecar.
  *
- * INDEPENDENT of fidelity_run — run() always compares against gold already on
+ * INDEPENDENT of run() — visual execution always compares against gold already on
  * disk, so no failure here may ever propagate into a fidelity verdict.
  *
  * Security: the token is read from env at call time, sent only as the

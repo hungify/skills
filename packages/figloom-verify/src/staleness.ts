@@ -2,7 +2,7 @@ import { readGoldMeta, resolveToken } from "./fetch-gold.ts";
 /**
  * Gold staleness check — ALWAYS warnings, never hard-fail.
  * Independent from fetch-gold error handling: a failure to re-check freshness
- * never fails fidelity_run.
+ * never changes a visual verdict.
  */
 import { getNodeMetadata } from "./figma-api.ts";
 

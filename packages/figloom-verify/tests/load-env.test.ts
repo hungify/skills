@@ -6,13 +6,13 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { loadAncestorEnv } from "../src/load-env.ts";
 
-const originalValue = process.env.FIGMA_FIDELITY_LOAD_ENV_TEST;
+const originalValue = process.env.FIGLOOM_LOAD_ENV_TEST;
 
 afterEach(() => {
   if (originalValue === undefined) {
-    delete process.env.FIGMA_FIDELITY_LOAD_ENV_TEST;
+    delete process.env.FIGLOOM_LOAD_ENV_TEST;
   } else {
-    process.env.FIGMA_FIDELITY_LOAD_ENV_TEST = originalValue;
+    process.env.FIGLOOM_LOAD_ENV_TEST = originalValue;
   }
 });
 
@@ -25,18 +25,18 @@ describe("loadAncestorEnv", () => {
     fs.writeFileSync(path.join(repo, ".git"), "");
     fs.writeFileSync(
       path.join(root, ".env"),
-      "FIGMA_FIDELITY_LOAD_ENV_TEST=outside\n",
+      "FIGLOOM_LOAD_ENV_TEST=outside\n",
     );
     fs.writeFileSync(
       path.join(repo, ".env"),
-      "FIGMA_FIDELITY_LOAD_ENV_TEST=inside\n",
+      "FIGLOOM_LOAD_ENV_TEST=inside\n",
     );
 
-    delete process.env.FIGMA_FIDELITY_LOAD_ENV_TEST;
+    delete process.env.FIGLOOM_LOAD_ENV_TEST;
     const loaded = loadAncestorEnv(nested);
 
     expect(loaded).toEqual([path.join(repo, ".env")]);
-    expect(process.env.FIGMA_FIDELITY_LOAD_ENV_TEST).toBe("inside");
+    expect(process.env.FIGLOOM_LOAD_ENV_TEST).toBe("inside");
     fs.rmSync(root, { recursive: true, force: true });
   });
 });

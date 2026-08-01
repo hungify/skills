@@ -35,24 +35,8 @@ export type { StalenessOptions } from "./staleness.ts";
 export { getProfile, PROFILES } from "./profiles.ts";
 export type { Profile } from "./profiles.ts";
 export { run } from "./run.ts";
-export { createFidelityMcpServer, startMcpServer, startMcpServerHttp } from "./mcp.ts";
-export {
-  ALL_AGENTS,
-  buildServerEntry,
-  detectClients,
-  setupAgents,
-  upsertTomlSection,
-  wrapNpx,
-} from "./setup.ts";
-export type {
-  AgentId,
-  DetectedClient,
-  LaunchMode,
-  SetupOptions,
-  SetupResult,
-  SetupTargetResult,
-  StdioServerEntry,
-} from "./setup.ts";
+export { doneGateFromArtifact, verify, writeVerificationArtifact } from "./verify.ts";
+export type { VerifyOptions } from "./verify.ts";
 export { specGate, specSizeTolerance } from "./spec/gate.ts";
 export type { SpecGateInput, SpecGateOutcome } from "./spec/gate.ts";
 export { resolveProfile, validateScope } from "./scope.ts";
@@ -84,9 +68,12 @@ export {
   runTypeSchema,
   viewportSchema,
   expectSizeSchema,
-  goldRefSchema,
-  scopeSchema,
-  runOptionsSchema,
   verificationContractSchema,
-  viewportContractSchema,
-} from "./mcp-schemas.ts";
+  verificationRequestSchema,
+  verificationArtifactSchema,
+} from "./contracts.ts";
+export type {
+  VerificationArtifact,
+  VerificationContract,
+  VerificationRequest,
+} from "./contracts.ts";

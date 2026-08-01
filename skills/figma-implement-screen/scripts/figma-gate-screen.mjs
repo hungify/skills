@@ -1,12 +1,16 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
+import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { getFrameworkAdapter } from "./adapters/index.mjs";
-import { checkDoneGate } from "./lib/fidelity-done-gate.mjs";
-import { componentRegistryCommand, loadScreenConfig } from "./screen-config.mjs";
+import {
+  componentRegistryCommand,
+  loadScreenConfig,
+  visualVerifyCommand,
+} from "./screen-config.mjs";
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const componentGate = path.join(scriptDir, "figma-gate-screen-components-internal.mjs");
 function fail(reasons) {
@@ -29,7 +33,8 @@ function runStep(command, args, label) {
   });
   if (result.status !== 0) {
     const output2 = `${result.stdout ?? ""}
-${result.stderr ?? ""}`.trim();
+${result.stderr ?? ""}
+${result.error?.message ?? ""}`.trim();
     fail([
       `${label} failed${
         output2
@@ -64,62 +69,95 @@ function readJson(file) {
 function sameJson(left, right) {
   return canonicalize(left) === canonicalize(right);
 }
-function isVisualQualityReason(reason) {
-  return reason === "pass is not true." || reason === "blocking residual diff cluster remains.";
-}
 function formatMatchRatio(value) {
   return typeof value === "number" ? `${(value * 100).toFixed(2)}%` : "n/a";
 }
-function validateVisuals(artifact, reasons) {
-  const verdict = checkDoneGate({
-    viewports: artifact.visualContracts.map((contract) => ({
-      viewport: contract.viewport.name,
-      outDir: path.resolve(contract.outDir),
+function validateVisuals(artifact, config, reasons) {
+  const reference = artifact.visualVerification;
+  if (!reference) {
+    reasons.push("visualVerification artifact reference required by unified gate");
+    return artifact.visualContracts.length;
+  }
+  const verificationPath = path.resolve(reference.artifactPath);
+  if (!fs.existsSync(verificationPath)) {
+    reasons.push(`visual verification artifact missing: ${reference.artifactPath}`);
+    return artifact.visualContracts.length;
+  }
+  const actualHash = `sha256:${crypto
+    .createHash("sha256")
+    .update(fs.readFileSync(verificationPath))
+    .digest("hex")}`;
+  if (actualHash !== reference.contentHash) {
+    reasons.push(`visual verification artifact hash mismatch: ${reference.artifactPath}`);
+    return artifact.visualContracts.length;
+  }
+  const verification = readJson(verificationPath);
+  if (
+    verification.schemaVersion !== 1 ||
+    verification.kind !== "figloom.visual-verification" ||
+    verification.request?.schemaVersion !== 1 ||
+    typeof verification.request?.url !== "string" ||
+    !Array.isArray(verification.request?.contracts) ||
+    !Array.isArray(verification.results)
+  ) {
+    reasons.push("visual verification artifact schema/kind invalid");
+    return artifact.visualContracts.length;
+  }
+  const requestById = new Map(verification.request.contracts.map((contract) => [contract.id, contract]));
+  const resultById = new Map(verification.results.map((result) => [result.id, result]));
+  if (requestById.size !== verification.request.contracts.length) {
+    reasons.push("visual verification contains duplicate contract IDs");
+  }
+  if (resultById.size !== verification.results.length) {
+    reasons.push("visual verification contains duplicate result IDs");
+  }
+  for (const contract of artifact.visualContracts) {
+    const requested = requestById.get(contract.id);
+    if (!requested) {
+      reasons.push(`visual verification missing contract ${contract.id}`);
+      continue;
+    }
+    const expected = {
+      id: contract.id,
       fileKey: artifact.source.fileKey,
       nodeId: contract.goldNodeId,
-      profile: contract.profile,
-      selector: contract.scope === "region" ? contract.selector : void 0,
-      expectSize: contract.scope === "region" ? contract.expectSize : void 0,
-      pageReason: contract.scope === "page" ? contract.pageReason : void 0,
-    })),
-    cwd: process.cwd(),
-  });
-  verdict.viewports.forEach((viewport, index) => {
-    const contract = artifact.visualContracts[index];
-    if (!contract) return;
-    const integrityReasons = viewport.reasons.filter((reason) => !isVisualQualityReason(reason));
-    if (integrityReasons.length > 0) {
-      reasons.push(
-        `visual contract ${contract.id} evidence invalid: ${integrityReasons.join("; ")}`,
-      );
-    }
-    const scorePath = path.join(path.resolve(contract.outDir), "visual-score.json");
-    if (!fs.existsSync(scorePath)) return;
-    const score = readJson(scorePath);
-    const qualityReasons = viewport.reasons.filter(isVisualQualityReason);
-    const summary = `${contract.id} match=${formatMatchRatio(score.matchRatio)} engine-pass=${String(score.pass === true)} diff=${path.join(path.resolve(contract.outDir), "diff.png")}`;
-    if (qualityReasons.length > 0) {
-      reasons.push(
-        `visual contract ${contract.id} quality blocked: ${summary}; ${qualityReasons.join("; ")}`,
-      );
-    } else {
-      console.log(`visual-review: ${summary}`);
-    }
-  });
-  for (const contract of artifact.visualContracts) {
-    const outDir = path.resolve(contract.outDir);
-    const runMetaPath = path.join(outDir, "run-meta.json");
-    if (!fs.existsSync(runMetaPath)) continue;
-    const runMeta = readJson(runMetaPath);
-    const expectedViewportSize = {
-      width: contract.viewport.width,
-      height: contract.viewport.height,
+      viewport: contract.viewport,
+      outDir: contract.outDir,
+      scope:
+        contract.scope === "page"
+          ? { kind: "page", pageReason: contract.pageReason }
+          : { kind: "region", selector: contract.selector, expectSize: contract.expectSize },
+      ...(contract.scope === "region" ? { profile: contract.profile } : {}),
     };
-    if (!sameJson(runMeta.viewportSize, expectedViewportSize)) {
-      reasons.push(
-        `visual contract ${contract.id} runMeta.viewportSize mismatch: actual=${JSON.stringify(runMeta.viewportSize)} expected=${JSON.stringify(expectedViewportSize)}`,
-      );
+    const actual = Object.fromEntries(
+      Object.keys(expected).map((key) => [key, requested[key]]),
+    );
+    if (!sameJson(actual, expected)) {
+      reasons.push(`visual verification contract ${contract.id} does not match screen declaration`);
     }
+    const result = resultById.get(contract.id);
+    if (!result || result.ok !== true || result.pass !== true) {
+      reasons.push(`visual verification result ${contract.id} is not passing`);
+    }
+  }
+  if (requestById.size !== artifact.visualContracts.length) {
+    reasons.push("visual verification contract count does not match screen declaration");
+  }
+  if (resultById.size !== artifact.visualContracts.length) {
+    reasons.push("visual verification result count does not match screen declaration");
+  }
+  if (verification.ok !== true) reasons.push("visual verification ok is not true");
+  if (verification.allPassed !== true) reasons.push("visual verification allPassed is not true");
+  if (reasons.length > 0) return artifact.visualContracts.length;
+
+  const command = visualVerifyCommand(config, verificationPath);
+  runStep(command.command, command.args, "visual verification done gate");
+  for (const contract of artifact.visualContracts) {
+    const scorePath = path.join(path.resolve(contract.outDir), "visual-score.json");
+    const score = readJson(scorePath);
+    console.log(
+      `visual-review: ${contract.id} match=${formatMatchRatio(score.matchRatio)} engine-pass=${String(score.pass === true)} diff=${path.join(path.resolve(contract.outDir), "diff.png")}`,
+    );
   }
   return artifact.visualContracts.length;
 }
@@ -185,8 +223,8 @@ function main() {
     }
   }
   for (const contract of artifact.visualContracts) {
-    if (!contract.outDir.startsWith(`${taskDir}/`)) {
-      reasons.push(`visual contract ${contract.id} escapes screen task directory`);
+    if (!contract.outDir.startsWith(".figma/artifacts/visual-verifications/")) {
+      reasons.push(`visual contract ${contract.id} must use visual-verifications artifact root`);
     }
   }
   if (!artifact.inventoryEvidence) reasons.push("inventoryEvidence required by unified gate");
@@ -198,7 +236,7 @@ function main() {
       `entryComponents[] required by unified gate (empty allowed only when no local ${frameworkName} roots)`,
     );
   }
-  const visualContracts = validateVisuals(artifact, reasons);
+  const visualContracts = validateVisuals(artifact, config, reasons);
   if (reasons.length > 0) fail(reasons);
   console.log("PASS");
   console.log(`artifact: ${path.relative(process.cwd(), artifactPath)}`);

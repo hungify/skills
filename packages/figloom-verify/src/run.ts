@@ -38,7 +38,7 @@ export async function run(options: RunOptions): Promise<FidelityResult> {
   const runType = options.runType ?? "dev";
   if (!fs.existsSync(options.goldPath)) {
     throw new Error(
-      `Gold not found on disk: ${options.goldPath}. Run fetch-gold first (fetch-gold failures never fail fidelity_run; run simply requires gold to exist).`,
+      `Gold not found on disk: ${options.goldPath}. Run figloom verify or figloom fetch-gold first.`,
     );
   }
   const expectedGoldPath = path.resolve(options.outDir, "figma-gold.png");
@@ -57,7 +57,7 @@ export async function run(options: RunOptions): Promise<FidelityResult> {
       schemaVersion: SCHEMA_VERSION,
       ok: false,
       error: "GOLD_META_REQUIRED",
-      message: "figma-gold.meta.json required; run fidelity_fetch_gold before fidelity_run.",
+      message: "figma-gold.meta.json required; run figloom verify or figloom fetch-gold first.",
     };
   }
   if (

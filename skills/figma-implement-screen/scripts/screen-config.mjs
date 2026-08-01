@@ -13,6 +13,7 @@ const screenConfigSchema = z
       .string()
       .min(1)
       .default(".agents/skills/figma-component-registry/scripts/figma-component-registry.mjs"),
+    visualVerifyCli: z.string().min(1).default("figloom"),
   })
   .strict();
 const DEFAULT_SCREEN_CONFIG = {
@@ -22,6 +23,7 @@ const DEFAULT_SCREEN_CONFIG = {
   screensGlob: "src/features/*/screens/*/",
   componentRegistryCli:
     ".agents/skills/figma-component-registry/scripts/figma-component-registry.mjs",
+  visualVerifyCli: "figloom",
 };
 function normalizeSlashes(value) {
   return value.replace(/\\/g, "/").replace(/^\.\//, "");
@@ -116,6 +118,12 @@ function componentRegistryCommand(config, action, components) {
   if (components.length > 0) args.push("--components", components.join(","));
   return { command: process.execPath, args };
 }
+function visualVerifyCommand(config, artifactPath) {
+  return {
+    command: config.visualVerifyCli,
+    args: ["done-gate", "--artifact", artifactPath],
+  };
+}
 export {
   DEFAULT_SCREEN_CONFIG,
   SCREEN_CONFIG_PATH,
@@ -125,4 +133,5 @@ export {
   matchesScreensGlob,
   normalizeImportPath,
   packageScriptCommand,
+  visualVerifyCommand,
 };
