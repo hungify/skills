@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "bindingPath": "Button > State",
+      "bindingIdentity": {
+        "componentPath": "Button",
+        "groupName": "Button",
+        "propName": "State",
+        "figmaNodeId": "28:518"
+      },
+      "kind": "interaction",
+      "status": "passed",
+      "evidence": "src/components/ui/button-showcase.tsx"
+    }
+  ]
+}

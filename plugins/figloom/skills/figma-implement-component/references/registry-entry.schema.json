@@ -1,0 +1,137 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://internal/figma-implement-component/registry-entry.schema.json",
+  "title": "Registry entry (schemaVersion 3) — response from figma-component-registry",
+  "description": "Matches 1:1 with scripts/schemas/registry-entry.schema.json of figma-component-registry. validate_registry_entry.mjs remains the dependency-free runtime check.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "component", "figma", "codePropsMap", "figmaBindings"],
+  "properties": {
+    "schemaVersion": { "const": 3 },
+    "component": { "$ref": "#/$defs/component" },
+    "figma": { "$ref": "#/$defs/figma" },
+    "codePropsMap": { "$ref": "#/$defs/codePropsMap" },
+    "figmaBindings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/figmaBinding" }
+    }
+  },
+  "$defs": {
+    "figmaType": {
+      "type": "string",
+      "enum": ["VARIANT", "BOOLEAN", "TEXT", "INSTANCE_SWAP", "COMPONENT"]
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exportName", "exportType", "filePath"],
+      "properties": {
+        "exportName": { "type": "string", "minLength": 1 },
+        "exportType": { "type": "string", "enum": ["named", "default"] },
+        "filePath": { "type": "string", "minLength": 1 }
+      }
+    },
+    "figma": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["componentPath"],
+          "properties": {
+            "componentPath": { "type": "string", "minLength": 1 },
+            "lastKnownFileKey": { "type": ["string", "null"] },
+            "lastKnownNodeId": { "type": ["string", "null"] }
+          }
+        }
+      ]
+    },
+    "codePropDef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "minLength": 1 },
+        "values": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "codePropsMap": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/codePropDef" }
+    },
+    "directBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "componentPath", "groupName", "propName", "figmaType", "mappingKind", "prop"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "componentPath": { "type": "string", "minLength": 1 },
+        "groupName": { "type": "string", "minLength": 1 },
+        "propName": { "type": "string", "minLength": 1 },
+        "figmaType": { "$ref": "#/$defs/figmaType" },
+        "mappingKind": { "const": "direct" },
+        "prop": { "type": "string", "minLength": 1 },
+        "valueMap": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "figmaNodeId": { "type": ["string", "null"] }
+      }
+    },
+    "bundleBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "componentPath", "groupName", "propName", "figmaType", "mappingKind", "props", "valueProps"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "componentPath": { "type": "string", "minLength": 1 },
+        "groupName": { "type": "string", "minLength": 1 },
+        "propName": { "type": "string", "minLength": 1 },
+        "figmaType": { "$ref": "#/$defs/figmaType" },
+        "mappingKind": { "const": "bundle" },
+        "props": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "valueProps": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "figmaNodeId": { "type": ["string", "null"] }
+      }
+    },
+    "noteBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "componentPath", "groupName", "propName", "figmaType", "mappingKind", "note"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "componentPath": { "type": "string", "minLength": 1 },
+        "groupName": { "type": "string", "minLength": 1 },
+        "propName": { "type": "string", "minLength": 1 },
+        "figmaType": { "$ref": "#/$defs/figmaType" },
+        "mappingKind": {
+          "type": "string",
+          "enum": ["composition", "unsupported", "static"]
+        },
+        "note": { "type": "string", "minLength": 1 },
+        "figmaNodeId": { "type": ["string", "null"] }
+      }
+    },
+    "figmaBinding": {
+      "oneOf": [
+        { "$ref": "#/$defs/directBinding" },
+        { "$ref": "#/$defs/bundleBinding" },
+        { "$ref": "#/$defs/noteBinding" }
+      ]
+    }
+  }
+}

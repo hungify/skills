@@ -17,12 +17,22 @@ const entries = [
     source: path.join(repoRoot, 'skills', 'verify-visual'),
     destination: path.join(repoRoot, 'plugins', 'figloom', 'skills', 'verify-visual'),
   },
+  {
+    source: path.join(repoRoot, 'skills', 'figma-implement-component'),
+    destination: path.join(repoRoot, 'plugins', 'figloom', 'skills', 'figma-implement-component'),
+    // Only coverage_check.mjs needs bundling — it's the one script that
+    // imports npm packages (@babel/parser, @babel/types); every other script
+    // in this skill stays dependency-free and is copied through as source,
+    // unbundled.
+    bundleEntry: 'scripts/coverage_check.mjs',
+  },
 ];
 const excludedNames = new Set(['.DS_Store', 'node_modules']);
 const managedOnlyExclusions = [
   '.gitignore',
   'evals',
   'scripts/figma-component-registry-tests.mjs',
+  'scripts/figma-implement-component-pressure.mjs',
   'scripts/fixtures',
   'scripts/lib',
   'scripts/package-lock.json',
@@ -149,13 +159,13 @@ function syncTree(source, destination, bundleEntry, trackedFiles) {
     if (!fs.existsSync(sourceEntry)) {
       throw new Error(`Declared bundle entry is missing: ${path.relative(repoRoot, sourceEntry)}`);
     }
-    const bundledEntry = path.join(
-      destination,
-      'scripts',
-      'lib',
-      'validate',
-      'figma-component-registry.bundle.mjs',
-    );
+    // Bundle output/shim naming is derived from bundleEntry's own basename
+    // (e.g. "scripts/coverage_check.mjs" -> "coverage_check.bundle.mjs"), so
+    // adding a new bundled entry never collides with an existing one. The
+    // "scripts/lib/validate/" location is arbitrary but shared across every
+    // entry for one predictable place to look for generated bundles.
+    const entryName = path.basename(bundleEntry, path.extname(bundleEntry));
+    const bundledEntry = path.join(destination, 'scripts', 'lib', 'validate', `${entryName}.bundle.mjs`);
     buildSync({
       entryPoints: [sourceEntry],
       outfile: bundledEntry,
@@ -170,8 +180,8 @@ function syncTree(source, destination, bundleEntry, trackedFiles) {
       logLevel: 'silent',
     });
     fs.writeFileSync(
-      path.join(destination, 'scripts', 'figma-component-registry.mjs'),
-      "import './lib/validate/figma-component-registry.bundle.mjs';\n",
+      path.join(destination, bundleEntry),
+      `import './lib/validate/${entryName}.bundle.mjs';\n`,
     );
   }
 }

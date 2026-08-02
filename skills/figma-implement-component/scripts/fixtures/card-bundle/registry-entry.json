@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 3,
+  "component": { "exportName": "Card", "exportType": "named", "filePath": "src/components/ui/card.tsx" },
+  "figma": { "componentPath": "Card", "lastKnownFileKey": null, "lastKnownNodeId": null },
+  "codePropsMap": {
+    "padding": { "type": "enum", "values": ["sm", "lg"] },
+    "gap": { "type": "enum", "values": ["sm", "lg"] },
+    "disabled": { "type": "boolean" }
+  },
+  "figmaBindings": [
+    {
+      "path": "Card > Density",
+      "componentPath": "Card",
+      "groupName": "Card",
+      "propName": "Density",
+      "figmaType": "VARIANT",
+      "mappingKind": "bundle",
+      "figmaNodeId": null,
+      "props": ["padding", "gap", "disabled"],
+      "valueProps": {
+        "Compact": { "padding": "sm", "gap": "sm", "disabled": false },
+        "Comfortable": { "padding": "lg", "gap": "lg", "disabled": true }
+      }
+    },
+    {
+      "path": "Card > Root",
+      "componentPath": "Card",
+      "groupName": "Card",
+      "propName": "Root",
+      "figmaType": "COMPONENT",
+      "mappingKind": "static",
+      "note": "Zero componentPropertyDefinitions; node<->code correspondence only."
+    }
+  ]
+}
