@@ -1,0 +1,47 @@
+{
+  "skill_name": "verify-visual",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Verify full-page http://127.0.0.1:3000/login at 1440x1024 against Figma node https://www.figma.com/design/file123/App?node-id=153-5181. Do not modify code.",
+      "expected_output": "Creates an exact page contract, runs the published npm CLI via npx --yes figloom-verify@0.0.3 for verify and done-gate, inspects diff evidence, and reports without editing code.",
+      "expectations": ["Uses npx --yes figloom-verify@0.0.3, not MCP", "Preserves node 153:5181", "Does not modify implementation or host dependencies"]
+    },
+    {
+      "id": 2,
+      "prompt": "Compare [data-testid='profile-card'] on http://127.0.0.1:3000/components/profile at viewport 480x640 with Figma node https://www.figma.com/design/file456/App?node-id=22-45 sized 320x240.",
+      "expected_output": "Uses a strict region contract with unique selector and expected size.",
+      "expectations": ["Chooses region scope", "Records expectSize 320x240", "Uses component/strict final evidence"]
+    },
+    {
+      "id": 3,
+      "prompt": "Audit Figma desktop frame https://www.figma.com/design/checkout123/App?node-id=10-20 at 1440x1024 and mobile frame https://www.figma.com/design/checkout123/App?node-id=10-21 at 390x844 against http://127.0.0.1:3000/checkout.",
+      "expected_output": "Creates two isolated primary contracts in one bounded batch and reports each viewport independently.",
+      "expectations": ["Creates one contract per supplied node", "Does not share outDir", "Reports both diffs"]
+    },
+    {
+      "id": 4,
+      "prompt": "The visual command for /workspace/app/.figloom/artifacts/visual-verifications/login/run-1/visual-verification.json exited 1. Tell me whether verification infrastructure failed.",
+      "expected_output": "Treats exit 1 as a completed mismatch, reads verification artifact and diff, and reports failed visual contract.",
+      "expectations": ["Distinguishes mismatch from tool error", "Reads artifact", "Does not claim pass"]
+    },
+    {
+      "id": 5,
+      "prompt": "Revalidate /workspace/app/.figloom/artifacts/visual-verifications/login/run-1/visual-verification.json before handoff.",
+      "expected_output": "Runs the published npm CLI via npx --yes figloom-verify@0.0.3 for done-gate against the exact artifact and checks freshness, hashes, scope, identity, stability, and residual clusters.",
+      "expectations": ["Does not recapture unless evidence is stale or invalid", "Runs npx --yes figloom-verify@0.0.3 done-gate", "Reports exact invalid evidence"]
+    },
+    {
+      "id": 6,
+      "prompt": "Verify hover state from Figma node https://www.figma.com/design/file789/App?node-id=30-40 against [data-testid='menu-item'] on http://127.0.0.1:3000/menu at 1280x720, but no deterministic hover showcase or setup instructions exist.",
+      "expected_output": "Stops because requested rendered state is not deterministic and asks for a stable showcase/state route.",
+      "expectations": ["Does not invent state setup", "Does not compare normal state against hover gold", "Reports missing deterministic state"]
+    },
+    {
+      "id": 7,
+      "prompt": "Compare https://app.example.com/dashboard against our last approved staging deploy at https://staging.example.com/dashboard (revision deploy-2026-07-30), masking the live '.countdown' timer.",
+      "expected_output": "Creates a web baseline contract with an explicit revision label, sets maskSelectors on the web baseline, and does not require FIGMA_ACCESS_TOKEN.",
+      "expectations": ["Uses baseline.kind web with non-empty revision", "Sets maskSelectors: ['.countdown']", "Does not gate on figmaTokenAvailable for this contract"]
+    }
+  ]
+}

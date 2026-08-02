@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 4,
+  "target": { "kind": "web", "url": "http://127.0.0.1:3000/checkout" },
+  "contracts": [
+    {
+      "id": "checkout.desktop",
+      "baseline": {
+        "kind": "web",
+        "url": "https://staging.example.com/checkout",
+        "revision": "prod-2026-07-30"
+      },
+      "viewport": { "name": "desktop", "width": 1440, "height": 1024 },
+      "outDir": ".figloom/artifacts/visual-verifications/checkout/run-1/checkout.desktop",
+      "scope": {
+        "kind": "page",
+        "pageReason": "Regression check: full checkout screen vs previous approved deploy."
+      },
+      "stabilitySamples": 3,
+      "timeoutMs": 30000,
+      "maskSelectors": ["[data-testid='order-total-timestamp']"]
+    }
+  ]
+}
