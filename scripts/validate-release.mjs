@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
+import { entries as figloomEntries, runSync as runFigloomSync } from './sync-figloom.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const expectedVersion = readJson('package.json').version;
@@ -13,15 +14,20 @@ const manifestPaths = [
   'plugins/figloom/.claude-plugin/plugin.json',
   'plugins/figloom/.cursor-plugin/plugin.json',
 ];
-const bundledCli = path.join(
-  repoRoot,
-  'plugins',
-  'figloom',
-  'skills',
-  'figma-component-registry',
-  'scripts',
-  'figma-component-registry.mjs',
-);
+// Bundled-CLI entries: skills that declare `bundleEntry` in sync-figloom.mjs ship their own
+// executable CLI script into the plugin bundle and get a generic load-check below. Today only
+// figma-component-registry does, and its extract-code smoke tests further down are specific to
+// that skill's CLI surface (framework-aware component extraction) — a future bundled-CLI skill
+// needs its own smoke cases, but the load-check itself is derived, not hardcoded to one skill.
+const bundledCliEntries = figloomEntries
+  .filter((entry) => entry.bundleEntry)
+  .map((entry) => ({
+    name: path.basename(entry.destination),
+    cliPath: path.join(entry.destination, ...entry.bundleEntry.split('/')),
+  }));
+const figmaComponentRegistryCli = bundledCliEntries.find(
+  (entry) => entry.name === 'figma-component-registry',
+)?.cliPath;
 
 function fail(message) {
   throw new Error(message);
@@ -165,29 +171,37 @@ const bundledSkills = fs
   .readdirSync(path.join(repoRoot, 'plugins', 'figloom', 'skills'), { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name);
-if (bundledSkills.length !== 1 || bundledSkills[0] !== 'figma-component-registry') {
-  fail(`Figloom must bundle only figma-component-registry; found ${bundledSkills.join(', ')}`);
+// Single source of truth: whatever sync-figloom.mjs's `entries` declares is what must be bundled.
+const expectedBundledSkills = figloomEntries.map((entry) => path.basename(entry.destination));
+const missingBundledSkills = expectedBundledSkills.filter((name) => !bundledSkills.includes(name));
+const unexpectedBundledSkills = bundledSkills.filter((name) => !expectedBundledSkills.includes(name));
+if (missingBundledSkills.length > 0 || unexpectedBundledSkills.length > 0) {
+  fail(
+    `Figloom must bundle exactly ${expectedBundledSkills.join(', ')}; found ${bundledSkills.join(', ')}`,
+  );
 }
 
-const syncCheck = spawnSync(process.execPath, ['scripts/sync-figloom.mjs', '--check'], {
-  cwd: repoRoot,
-  encoding: 'utf8',
-});
-if (syncCheck.status !== 0) fail(syncCheck.stderr || syncCheck.stdout || 'Bundle sync check failed');
+try {
+  runFigloomSync({ checkOnly: true });
+} catch (error) {
+  fail(error instanceof Error ? error.message : String(error));
+}
 
-const bundledCliCheck = spawnSync(process.execPath, [bundledCli, '__figloom_load_check__'], {
-  cwd: repoRoot,
-  encoding: 'utf8',
-});
-if (
-  bundledCliCheck.status !== 1 ||
-  !bundledCliCheck.stderr.includes('ERROR: Unknown command "__figloom_load_check__"')
-) {
-  fail(
-    bundledCliCheck.stderr ||
-      bundledCliCheck.stdout ||
-      'Bundled Figloom registry CLI did not load correctly',
-  );
+for (const { name, cliPath } of bundledCliEntries) {
+  const bundledCliCheck = spawnSync(process.execPath, [cliPath, '__figloom_load_check__'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  if (
+    bundledCliCheck.status !== 1 ||
+    !bundledCliCheck.stderr.includes('ERROR: Unknown command "__figloom_load_check__"')
+  ) {
+    fail(
+      bundledCliCheck.stderr ||
+        bundledCliCheck.stdout ||
+        `Bundled Figloom ${name} CLI did not load correctly`,
+    );
+  }
 }
 
 const smokeCases = [
@@ -228,7 +242,7 @@ for (const smokeCase of smokeCases) {
     const smoke = spawnSync(
       process.execPath,
       [
-        bundledCli,
+        figmaComponentRegistryCli,
         'extract-code',
         '--project-root',
         smokeRoot,

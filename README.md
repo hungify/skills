@@ -12,6 +12,7 @@ Choose one mode for the same skill. Installing both may expose duplicate skills 
 Figloom is the managed Figma workflow plugin from Hungify. Current release includes:
 
 - `figma-component-registry`: synchronize Figma component metadata with code, validate registry entries, and detect drift after component edits.
+- `verify-visual`: verify visual parity between rendered code and a known-good baseline — a Figma node or another web state — without implementing or modifying UI.
 
 Planned Figloom skills:
 
@@ -19,6 +20,27 @@ Planned Figloom skills:
 - `figma-implement-screen`
 
 `shadcn-design-md` and `spec-design-md` remain standalone skills. They are not bundled with Figloom.
+
+### Usage examples
+
+`verify-visual` triggers from a plain-language ask; the agent picks `figma` or `web` baseline from what you supply.
+
+Web-vs-web regression (current code vs a previously approved deploy):
+
+```text
+Verify http://localhost:3000/checkout against https://staging.example.com/checkout
+(revision prod-2026-07-30) at 1440x1024, full page. Do not modify code.
+```
+
+Figma-vs-web (rendered code vs a Figma node):
+
+```text
+Verify http://localhost:3000/login against Figma node
+https://www.figma.com/design/abc123/App?node-id=153-5181 at 1440x1024, full page.
+Do not modify code.
+```
+
+`FIGMA_ACCESS_TOKEN` is required for the Figma-baseline case. Set it in the shell environment, or in `.env`/`.env.local` anywhere between the project root and the nearest ancestor `.git` directory — the CLI loads it automatically. See `skills/verify-visual/references/contract.md` for the full contract JSON each of these produces.
 
 ## Managed installation
 
@@ -73,6 +95,7 @@ Available standalone skills:
 | Skill | Purpose |
 | --- | --- |
 | `figma-component-registry` | Synchronize and validate Figma-to-code component registry entries. |
+| `verify-visual` | Verify visual parity between rendered code and a Figma node or web baseline. |
 | `spec-design-md` | Generate a DESIGN.md specification from a product brief or brand direction. |
 | `shadcn-design-md` | Extract a DESIGN.md visual language from an existing shadcn and Tailwind codebase. |
 
@@ -81,6 +104,7 @@ Available standalone skills:
 ```text
 skills/                              # canonical standalone skill source
   figma-component-registry/
+  verify-visual/
   shadcn-design-md/
   spec-design-md/
 

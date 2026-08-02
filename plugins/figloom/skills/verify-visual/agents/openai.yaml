@@ -1,0 +1,7 @@
+interface:
+  display_name: "Visual Verify"
+  short_description: "Verify rendered code against a Figma node or a known-good web baseline"
+  default_prompt: "Use $verify-visual to compare this rendered implementation with the supplied baseline (Figma node or web state) and report visual evidence."
+
+policy:
+  allow_implicit_invocation: true
