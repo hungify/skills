@@ -187,19 +187,34 @@ try {
   fail(error instanceof Error ? error.message : String(error));
 }
 
+// Every bundled entry is invoked with no args, which is guaranteed to hit
+// each script's own "missing input" error path (never its happy path) — the
+// exact message/exit code differs per script (a multi-command CLI dispatcher
+// vs. a single-purpose --flag script), so this only asserts what's actually
+// generic across all of them: the bundle is self-contained and the process
+// exits cleanly through the script's own error handling. It fails loudly on
+// anything that indicates the bundle didn't even load correctly: the spawn
+// itself erroring, the process dying to a signal (e.g. an uncaught
+// exception aborting), a module-resolution error (packages:'bundle' failed
+// to inline a real dependency), or an unexpected clean exit(0) — none of
+// these bundled CLIs has a valid no-args happy path.
+const moduleResolutionFailure = /cannot find (package|module)|err_module_not_found/i;
 for (const { name, cliPath } of bundledCliEntries) {
-  const bundledCliCheck = spawnSync(process.execPath, [cliPath, '__figloom_load_check__'], {
+  const bundledCliCheck = spawnSync(process.execPath, [cliPath], {
     cwd: repoRoot,
     encoding: 'utf8',
   });
-  if (
-    bundledCliCheck.status !== 1 ||
-    !bundledCliCheck.stderr.includes('ERROR: Unknown command "__figloom_load_check__"')
-  ) {
+  const combinedOutput = [bundledCliCheck.stderr, bundledCliCheck.stdout].filter(Boolean).join('\n');
+  const unexpectedStartupFailure =
+    Boolean(bundledCliCheck.error) ||
+    Boolean(bundledCliCheck.signal) ||
+    moduleResolutionFailure.test(combinedOutput) ||
+    bundledCliCheck.status === 0;
+  if (unexpectedStartupFailure) {
     fail(
-      bundledCliCheck.stderr ||
-        bundledCliCheck.stdout ||
-        `Bundled Figloom ${name} CLI did not load correctly`,
+      `Bundled Figloom ${name} CLI failed to load or exited unexpectedly ` +
+        `(status=${bundledCliCheck.status}, signal=${bundledCliCheck.signal}):\n` +
+        (combinedOutput || String(bundledCliCheck.error)),
     );
   }
 }

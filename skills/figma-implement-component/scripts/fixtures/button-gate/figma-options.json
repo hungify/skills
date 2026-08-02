@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "groups": [
+    {
+      "componentPath": "Button",
+      "groupName": "Button",
+      "propName": "Color",
+      "figmaNodeId": "28:518",
+      "options": ["Green", "Blue"]
+    }
+  ]
+}

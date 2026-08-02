@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 3,
+  "component": {
+    "exportName": "Button",
+    "exportType": "named",
+    "filePath": "src/components/ui/button.tsx"
+  },
+  "figma": {
+    "componentPath": "Button",
+    "lastKnownFileKey": "FIXTURE",
+    "lastKnownNodeId": "28:518"
+  },
+  "codePropsMap": {
+    "size": {
+      "type": "\"sm\" | \"md\"",
+      "values": ["sm", "md"]
+    },
+    "variant": {
+      "type": "\"filled\" | \"outline\"",
+      "values": ["filled", "outline"]
+    },
+    "color": {
+      "type": "\"green\" | \"blue\"",
+      "values": ["green", "blue"]
+    }
+  },
+  "figmaBindings": [
+    {
+      "path": "Button > Size",
+      "componentPath": "Button",
+      "groupName": "Button",
+      "propName": "Size",
+      "figmaType": "VARIANT",
+      "mappingKind": "direct",
+      "figmaNodeId": "28:518",
+      "prop": "size",
+      "valueMap": {
+        "Small": "sm",
+        "Medium": "md"
+      }
+    },
+    {
+      "path": "Button > Type",
+      "componentPath": "Button",
+      "groupName": "Button",
+      "propName": "Type",
+      "figmaType": "VARIANT",
+      "mappingKind": "direct",
+      "figmaNodeId": "28:518",
+      "prop": "variant",
+      "valueMap": {
+        "Filled": "filled",
+        "Outline": "outline"
+      }
+    },
+    {
+      "path": "Button legacy > Type",
+      "componentPath": "Button",
+      "groupName": "Button legacy",
+      "propName": "Type",
+      "figmaType": "VARIANT",
+      "mappingKind": "direct",
+      "figmaNodeId": "28:383",
+      "prop": "variant",
+      "valueMap": {
+        "Filled": "filled"
+      }
+    },
+    {
+      "path": "Button > Color",
+      "componentPath": "Button",
+      "groupName": "Button",
+      "propName": "Color",
+      "figmaType": "VARIANT",
+      "mappingKind": "direct",
+      "figmaNodeId": "28:518",
+      "prop": "color"
+    },
+    {
+      "path": "Button > State",
+      "componentPath": "Button",
+      "groupName": "Button",
+      "propName": "State",
+      "figmaType": "VARIANT",
+      "mappingKind": "unsupported",
+      "figmaNodeId": "28:518",
+      "note": "Pseudo-state is validated through interaction coverage."
+    }
+  ]
+}

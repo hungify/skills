@@ -1,0 +1,99 @@
+{
+  "skill_name": "figma-implement-component",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Implement the design-system Button from Figma. Use the fixture scripts/fixtures/button-gate/ as sample metadata and generate a gate artifact.",
+      "expected_output": "The skill runs all 5 steps, validates the registry entry, dedups the legacy variant node, uses figma-options for the identity color mapping, produces coverage with no gaps, and generates a pending-human-review gate artifact.",
+      "expectations": [
+        "Registry lookup runs before implementation",
+        "The target is classified as a design-system-component",
+        "figma-component-registry is triggered and its response is validated",
+        "Scoped registry check and live verify-source both pass before the fidelity gate",
+        "Node 28:518 is chosen canonical for variant; node 28:383 is kept as a redundant-view",
+        "Coverage uses figma-options.json and does not skip the identity-mapped color",
+        "The unsupported State has behavior evidence keyed by structured binding identity instead of display path",
+        "The gate artifact has hash-bound registry freshness and status pending-human-review"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Implement a checkout form that uses Button and Input, per Figma, using figma-implement-component.",
+      "expected_output": "The skill does not apply to the whole checkout form since it's a feature/business component; it only routes the Button/Input UI primitives through the component workflow.",
+      "expectations": [
+        "The checkout form is not classified as a design-system-component",
+        "The skill only applies separately to Button/Input if they need implementation",
+        "No design-system-component gate artifact is created for the whole checkout form"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "The registry skill returned a response missing figmaBindings while implementing Badge. Just go ahead and create the gate artifact anyway.",
+      "expected_output": "The workflow stops immediately after the validation failure, lists the failing fields, and does not run the fidelity gate with fake or empty data.",
+      "expectations": [
+        "validate_registry_entry.mjs is run",
+        "The figmaBindings error is clearly reported",
+        "Step 5 does not run",
+        "No gate artifact is created"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Two Figma nodes for the size prop have the same valueMap key count and the same context score. Implement the component and just pick the first node to save time.",
+      "expected_output": "The skill does not silently decide a canonical; it keeps needsHumanReview with all candidates and the gate stays pending-human-review.",
+      "expectations": [
+        "The tie is recorded in needsHumanReview",
+        "The fallback choice is not presented as a reviewed decision",
+        "Every candidate node still has traceability",
+        "Status does not change to done"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Just describe this card's visual style in Figma, don't implement any code.",
+      "expected_output": "The skill does not trigger since the request isn't implementing a design-system component; it does not require coverage or a gate artifact.",
+      "expectations": [
+        "figma-implement-component is not invoked",
+        "Neither the registry nor the fidelity scripts run",
+        "No gate artifact is written"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "The Button registry entry passes schema but verify-source reports the Figma group was renamed. Just use the current entry to create the gate.",
+      "expected_output": "The workflow stops at registry freshness; it does not generate a gate from a stale source and reports the verify-source error verbatim.",
+      "expectations": [
+        "Scoped check and verify-source run after shape validation",
+        "A verify-source failure blocks the fidelity step",
+        "The registry path must be the exact canonical path the CLI looks up; an arbitrary copy is rejected",
+        "No fake registry freshness evidence is created",
+        "No gate artifact is created"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "The repo already has Storybook Button stories and play tests. Implement Button and also create a separate showcase TSX to make the gate easier.",
+      "expected_output": "The skill reuses the Storybook story as the harness, keeps a centralized testid manifest, and does not create a parallel harness if the story already covers the states.",
+      "expectations": [
+        "The existing Storybook story is preferred",
+        "The play function is used as interaction evidence when appropriate",
+        "No extra Storybook install or duplicate showcase is created",
+        "Coverage still verifies every expected testid",
+        "A comment, dead constant, or unrelated JSX does not count as a rendered state"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Use figloom-verify@0.0.3 for Button, but done-gate hasn't run yet and there's no hash-bound verification artifact. Create the gate first and fill that in later.",
+      "expected_output": "Gate generation stops because the Figloom evidence manifest, validated for every expected testid, is missing.",
+      "expectations": [
+        "The gate has no legacy mode or flattened visual result cases",
+        "Each expected testid maps to exactly one schema-v4 component/strict region contract",
+        "The gate only keeps the verification artifact path and SHA-256 in figloomEvidence[]",
+        "Figloom verify and done-gate must pass before gate generation",
+        "The official done-gate owns score, threshold, PNG hash, and freshness validation",
+        "No artifact is created when figloomEvidence is missing or empty"
+      ]
+    }
+  ]
+}
