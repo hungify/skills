@@ -11,6 +11,7 @@
   "homepage": "https://github.com/hungify/skills#figloom",
   "repository": "https://github.com/hungify/skills",
   "license": "MIT",
+  "logo": "./assets/logo.svg",
   "keywords": [
     "figma",
     "component-registry",
