@@ -13,10 +13,10 @@ Figloom is the managed Figma workflow plugin from Hungify. Current release inclu
 
 - `figma-component-registry`: synchronize Figma component metadata with code, validate registry entries, and detect drift after component edits.
 - `verify-visual`: verify visual parity between rendered code and a known-good baseline — a Figma node or another web state — without implementing or modifying UI.
+- `figma-implement-component`: implement a design-system component from Figma into code, gated by a `figma-component-registry` sync and a Figloom schema-v4 verification/done-gate pipeline.
 
 Planned Figloom skills:
 
-- `figma-implement-components`
 - `figma-implement-screen`
 
 `shadcn-design-md` and `spec-design-md` remain standalone skills. They are not bundled with Figloom.
@@ -96,6 +96,7 @@ Available standalone skills:
 | --- | --- |
 | `figma-component-registry` | Synchronize and validate Figma-to-code component registry entries. |
 | `verify-visual` | Verify visual parity between rendered code and a Figma node or web baseline. |
+| `figma-implement-component` | Implement a design-system component from Figma into code, gated by registry sync and Figloom verification. |
 | `spec-design-md` | Generate a DESIGN.md specification from a product brief or brand direction. |
 | `shadcn-design-md` | Extract a DESIGN.md visual language from an existing shadcn and Tailwind codebase. |
 
@@ -105,6 +106,7 @@ Available standalone skills:
 skills/                              # canonical standalone skill source
   figma-component-registry/
   verify-visual/
+  figma-implement-component/
   shadcn-design-md/
   spec-design-md/
 
