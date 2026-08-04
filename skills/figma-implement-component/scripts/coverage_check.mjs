@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { parse } from "@babel/parser";
 import { VISITOR_KEYS } from "@babel/types";
 import { loadJson, parseArgs } from "./_shared.mjs";
@@ -238,24 +239,97 @@ function collectReturnExpressions(node, out) {
 // same identifier the constant file exports). Default-export case (JSON
 // testids): any default import from the expected module.
 // Strips the extension a harness import may legally carry (".ts"/".js" are
-// valid specifiers under NodeNext ESM / allowImportingTsExtensions) so
-// `./button-showcase.testids` and `./button-showcase.testids.ts` compare equal.
+// valid specifiers under NodeNext ESM / allowImportingTsExtensions, and a
+// default-exported testids module may be plain JSON) so
+// `./button-showcase.testids`, `./button-showcase.testids.ts` and
+// `./button-showcase.testids.json` all compare equal once resolved.
 function stripModuleExtension(specifier) {
-  return specifier.replace(/\.(?:ts|tsx|js|jsx|mjs)$/, "");
+  return specifier.replace(/\.(?:ts|tsx|js|jsx|mjs|json)$/, "");
 }
 
-function findImportedLocalName(programBody, expectedModule, exportName) {
+// Strips a trailing "//..." or "/*...*/" comment from tsconfig/jsconfig JSON
+// (both allow comments — JSONC — despite the .json extension), leaving
+// string literals untouched, then removes trailing commas so JSON.parse
+// doesn't choke on either.
+function parseJsonc(text) {
+  const withoutComments = text.replace(/("(?:\\.|[^"\\])*")|\/\/.*$|\/\*[\s\S]*?\*\//gm, (m, str) => str ?? "");
+  return JSON.parse(withoutComments.replace(/,(\s*[}\]])/g, "$1"));
+}
+
+// Walks upward from `startDir` looking for the nearest tsconfig.json /
+// jsconfig.json that declares compilerOptions.paths, so alias imports
+// (`@/foo`) can be resolved to a real file path alongside relative ones.
+// Returns null if none is found or the one found can't be parsed — callers
+// then simply can't resolve alias specifiers, which surfaces as the normal
+// "harness has not proven it renders every testid" error rather than a crash.
+function loadTsconfigAliases(startDir) {
+  let dir = path.resolve(startDir);
+  while (true) {
+    for (const name of ["tsconfig.json", "jsconfig.json"]) {
+      const candidate = path.join(dir, name);
+      if (!existsSync(candidate)) continue;
+      try {
+        const json = parseJsonc(readFileSync(candidate, "utf8"));
+        const paths = json.compilerOptions?.paths;
+        if (paths && typeof paths === "object") {
+          const baseDir = path.resolve(dir, json.compilerOptions.baseUrl || ".");
+          return { baseDir, paths };
+        }
+      } catch {
+        // Malformed tsconfig: keep walking rather than aborting the whole check.
+      }
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+// Resolves an import specifier (`@/components/button.testids`) against
+// tsconfig `paths` entries (`{"@/*": ["./src/*"]}`), returning an absolute
+// path with no extension, or null if no pattern matches (bare package
+// specifiers like "react" fall through here and are correctly ignored).
+function resolveAliasSpecifier(specifier, aliasConfig) {
+  if (!aliasConfig) return null;
+  let best = null;
+  for (const [pattern, targets] of Object.entries(aliasConfig.paths)) {
+    if (!Array.isArray(targets) || targets.length === 0) continue;
+    const target = targets[0];
+    if (pattern.endsWith("/*") && target.endsWith("/*")) {
+      const prefix = pattern.slice(0, -1);
+      if (!specifier.startsWith(prefix)) continue;
+      if (best && best.prefixLen >= prefix.length) continue;
+      const rest = specifier.slice(prefix.length);
+      best = { prefixLen: prefix.length, resolved: path.resolve(aliasConfig.baseDir, target.slice(0, -1), rest) };
+    } else if (pattern === specifier) {
+      if (best && best.prefixLen >= pattern.length) continue;
+      best = { prefixLen: pattern.length, resolved: path.resolve(aliasConfig.baseDir, target) };
+    }
+  }
+  return best ? best.resolved : null;
+}
+
+// Resolves a harness import specifier to an absolute, extension-stripped
+// path — via relative resolution ("./x") or a tsconfig alias ("@/x") — so it
+// can be compared against the testids file's own resolved path regardless of
+// which convention the repo's lint rules force the harness to use.
+function resolveImportTarget(harnessDir, specifier, aliasConfig) {
+  const bare = stripModuleExtension(specifier);
+  if (bare.startsWith(".")) return path.resolve(harnessDir, bare);
+  return resolveAliasSpecifier(bare, aliasConfig);
+}
+
+function findImportedLocalName(programBody, harnessDir, testidsTarget, exportName, aliasConfig) {
   for (const stmt of programBody) {
     if (stmt.type !== "ImportDeclaration" || stmt.source?.type !== "StringLiteral") continue;
-    const modText = stripModuleExtension(stmt.source.value);
+    const target = resolveImportTarget(harnessDir, stmt.source.value, aliasConfig);
+    if (target !== testidsTarget) continue;
     if (exportName) {
-      if (modText !== expectedModule) continue;
       const hasExport = stmt.specifiers.some(
         (spec) => spec.type === "ImportSpecifier" && (spec.imported.name ?? spec.imported.value) === exportName,
       );
       if (hasExport) return exportName;
     } else {
-      if (modText !== expectedModule && stmt.source.value !== `${expectedModule}.json`) continue;
       const defaultSpec = stmt.specifiers.find((spec) => spec.type === "ImportDefaultSpecifier");
       if (defaultSpec) return defaultSpec.local.name;
     }
@@ -283,8 +357,10 @@ function verifyHarness(filePath, testidsPath, exportName, expectedTestids) {
     throw new Error(`Harness '${filePath}' does not render any data-testid.`);
   }
 
-  const expectedModule = `./${testidsPath.split(/[\\/]/).pop().replace(/\.(?:ts|tsx|js|jsx|json)$/, "")}`;
-  const localName = findImportedLocalName(ast.program.body, expectedModule, exportName);
+  const harnessDir = path.dirname(path.resolve(filePath));
+  const testidsTarget = stripModuleExtension(path.resolve(testidsPath));
+  const aliasConfig = loadTsconfigAliases(harnessDir);
+  const localName = findImportedLocalName(ast.program.body, harnessDir, testidsTarget, exportName, aliasConfig);
 
   const returnExprs = [];
   collectReturnExpressions(ast.program, returnExprs);

@@ -39,6 +39,19 @@ If npm, network access, or package is unavailable, report exact blocker. Do not 
 npm exec --yes --package=figloom-verify@0.0.3 -- playwright install chromium
 ```
 
+`figloom.config.ts` is optional — `status`, `verify`, and `done-gate` all work with no config file present. The CLI reads it only for `storageStatePath` (a saved Playwright login session for a route behind auth). Only when the target route needs a logged-in session:
+
+```bash
+npm exec --yes --package=figloom-verify@0.0.3 -- figloom init --project-root <repo-root>
+npm exec --yes --package=figloom-verify@0.0.3 -- figloom auth --url <login-url> --project-root <repo-root>
+```
+
+`init` writes `figloom.config.ts` at the project root (refuses to overwrite an existing one without `--force`) and a git-ignored `.figloom/auth/` directory; `auth` opens Playwright for interactive login and saves the session to `.figloom/auth/user.json` — then uncomment `storageStatePath` in `figloom.config.ts`. Report this to the user once per run, since it writes a file to their project root:
+
+```text
+Figloom config: <written figloom.config.ts | already present | not needed (no auth route)>
+```
+
 ## Workflow
 
 1. Inspect supplied baseline (Figma node or web state) and rendered target. Preserve exact identity — node ID or baseline URL+revision.
@@ -61,7 +74,17 @@ npx --yes figloom-verify@0.0.3 done-gate \
   --artifact <task-dir>/visual-verification.json
 ```
 
-7. Preserve CLI-returned `artifactPath` and `contentHash` for consuming gates. Report exact verdict and artifact paths. Do not edit code, rerun implementation loops, or claim developer approval.
+7. Export a static dashboard report so a human reviewer can inspect the diff without opening raw PNGs one by one:
+
+```bash
+npx --yes figloom-verify@0.0.3 report \
+  --artifact <task-dir>/visual-verification.json \
+  --output <task-dir>/report
+```
+
+Report the report directory path alongside the artifact path. Do not run `figloom open` from this skill — it opens a live browser server and blocks on shutdown, unsuited to an automated read-only check; it's fine for the user to run manually afterward for a live view of the same dashboard.
+
+8. Preserve CLI-returned `artifactPath` and `contentHash` for consuming gates. Report exact verdict and artifact paths. Do not edit code, rerun implementation loops, or claim developer approval.
 
 ## Contract rules
 
@@ -95,4 +118,4 @@ Report one row per contract:
 id | baseline (figma node or web url@revision) | rendered URL | scope | viewport | matchRatio | pass | diff | notes
 ```
 
-Then report aggregate verdict, verification artifact path, unresolved mismatches, and required manual review. Visual verification proves rendered parity only; it does not prove behavior, accessibility, component reuse, or implementation quality.
+Then report aggregate verdict, verification artifact path, dashboard report directory path, unresolved mismatches, and required manual review. Visual verification proves rendered parity only; it does not prove behavior, accessibility, component reuse, or implementation quality.

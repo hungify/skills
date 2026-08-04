@@ -330,23 +330,42 @@ npm exec --yes --package=figloom-verify@0.0.3 -- \
   figloom status --project-root "$PWD"
 ```
 
-Write component cases from step 2's metadata, then run
-`figloom init --from-cases` to scaffold schema-v4 contracts in batches of at
-most 8. Each expected testid needs exactly 1 region contract: unique
-selector, exact Figma state `fileKey/nodeId`, exact `expectSize`, profile
-`component/strict`. Don't create a parallel visual-cases schema. Batch
-scaffolding belongs to the Figloom CLI, don't write a separate generator in
-this skill.
+Report the setup guideline below to the user once per component run (not per
+batch), so they know what the CLI needs and what was written to their
+project root — see `figloom-integration.md` for the exact wording and the
+optional `figloom init`/`figloom auth` setup for auth-gated showcase routes:
 
-For each batch, run `figloom verify`, inspect the image/diff/punch-list,
+```text
+Figloom config: <written figloom.config.ts | already present | not needed (no auth route)>
+Requires: Node >=22.13, FIGMA_ACCESS_TOKEN, target app already running.
+```
+
+There is no CLI flag to batch-generate contracts from step 2's metadata —
+`figloom contract create` is an interactive wizard for a human, not
+scriptable. Write the schema-v4 contract JSON directly instead, 1 region
+contract per expected testid: unique selector, exact Figma state
+`fileKey/nodeId`, exact `expectSize`, profile `component/strict`, at most 8
+contracts per file (`figloom schema --target contract` prints the live
+shape). Don't create a parallel visual-cases schema.
+
+For each batch file, run `figloom verify`, inspect the image/diff/punch-list,
 then run `figloom done-gate`. Don't use `allPassed` as a substitute for the
-final gate. Create a small manifest:
+final gate. After a batch passes, export a static dashboard for the human
+reviewer instead of pointing them at raw PNGs:
+
+```bash
+npm exec --yes --package=figloom-verify@0.0.3 -- \
+  figloom report --artifact <batch>.verification.json --output <batch>.report
+```
+
+Report the report directory path alongside the gate artifact. Create a small
+manifest:
 
 ```json
 {
   "schemaVersion": 1,
   "artifacts": [
-    { "verificationArtifactPath": ".figloom/artifacts/visual-verifications/button/verification-1.json" }
+    { "verificationArtifactPath": ".figloom/artifacts/visual-verifications/button/batch-1.verification.json" }
   ]
 }
 ```
